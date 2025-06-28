@@ -1,0 +1,40 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+cdk.out/
+lambda/**/*.js
+lambda/**/*.js.map
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment variables
+.env
+
+# Local IDE/Editor settings
+.vscode/
+.idea/
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+
+# CDK context
+cdk.context.json
+
+# Optional: Ignore test output
+lambda/test/output.json
