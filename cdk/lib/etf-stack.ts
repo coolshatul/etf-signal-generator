@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dotenv from 'dotenv';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 
@@ -26,7 +27,6 @@ export class EtfStack extends Stack {
             },
         });
 
-
         // ⏰ Schedule the Lambda to run at 9:00 AM IST (UTC+5:30 = 3:30 AM UTC)
         new events.Rule(this, 'DailySignalSchedule', {
             schedule: events.Schedule.cron({
@@ -36,5 +36,31 @@ export class EtfStack extends Stack {
             }),
             targets: [new targets.LambdaFunction(dailySignalLambda)],
         });
+
+        // 🤖 Telegram Webhook Lambda (for /summary NIFTYBEES etc.)
+        const telegramWebhookLambda = new NodejsFunction(this, 'TelegramWebhookLambda', {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            entry: path.join(__dirname, '../../lambda/handlers/telegramWebhook.ts'),
+            handler: 'handler',
+            timeout: Duration.seconds(10),
+            environment: {
+                TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
+                GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
+            },
+        });
+
+        // 🌐 API Gateway to expose the webhook
+        const api = new apigateway.RestApi(this, 'TelegramWebhookAPI', {
+            restApiName: 'Telegram Webhook API',
+            deployOptions: {
+                stageName: 'prod',
+            },
+        });
+
+        // /webhook POST endpoint
+        api.root.addResource('webhook').addMethod(
+            'POST',
+            new apigateway.LambdaIntegration(telegramWebhookLambda)
+        );
     }
 }

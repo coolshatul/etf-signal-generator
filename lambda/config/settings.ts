@@ -10,7 +10,7 @@ export const STRATEGY_SETTINGS: StrategySettings = {
     trailingTrigger: 5, // Start trailing after 5% gain
     trailingStop: 2, // Exit if drop from peak is >2%
     cooldownDays: 0, // Optional cooldown after SELL
-    backtestDays: 360, // Use 360 days of data for backtesting
+    backtestDays: 365, // Use 365 days of data for backtesting
 };
 
 // You can also export supported ETF symbols here if needed
