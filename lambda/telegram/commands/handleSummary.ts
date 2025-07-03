@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { analyzeETF } from '../../services/analyzeETF';
+import { sendMessage } from '../../utils/sendMessage';
 
 export async function handleSummary(bot: Telegraf<any>, chatId: number, symbol: string) {
     try {
@@ -10,17 +11,17 @@ export async function handleSummary(bot: Telegraf<any>, chatId: number, symbol: 
 
 📆 *Date:* ${result.date}
 💰 *Price:* ₹${result.price.toFixed(2)}
-📈 *RSI:* ${result.rsi.toFixed(2)} ${result.rsi > 50 ? '📈 (Bullish)' : '📉 (Bearish)'}
+📈 *RSI:* ${result.rsi.toFixed(2)} ${result.rsi > 50 ? '(Bullish)' : '(Bearish)'}
 🟢 *EMA(9):* ${result.emaFast.toFixed(2)}
 🔵 *EMA(21):* ${result.emaSlow.toFixed(2)}
 🚦 *Signal:* *${result.signal}*
 
-ℹ️ Powered by backtested strategy.
-        `.trim();
+ℹ️ Based on backtested strategy.
+    `.trim();
 
-        await bot.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        await sendMessage(bot, chatId, message);
     } catch (err) {
         console.error(err);
-        await bot.telegram.sendMessage(chatId, '❌ Could not analyze that symbol. Please try again.');
+        await sendMessage(bot, chatId, `❌ Could not analyze *${symbol}*. Please make sure it's a valid ETF symbol listed on NSE.`);
     }
 }

@@ -5,7 +5,8 @@
   "scripts": {
     "deploy": "cdk deploy --app \"npx ts-node -P tsconfig.cdk.json --prefer-ts-exts cdk/bin/etf.ts\"",
     "cdk": "cdk synth --app \"npx ts-node -P tsconfig.cdk.json --prefer-ts-exts cdk/bin/etf.ts\"",
-    "test-local": "npx ts-node lambda/test/testLocal.ts"
+    "test-local": "npx ts-node lambda/test/testLocal.ts",
+    "fundamental-local": "npx ts-node lambda/test/testFundamentalData.ts"
   },
   "keywords": [],
   "author": "",

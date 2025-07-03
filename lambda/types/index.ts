@@ -56,3 +56,33 @@ export interface StrategyResult {
     };
 }
 
+export interface FundamentalData {
+    symbol: string;
+    instrumentType: 'Stock' | 'ETF' | 'MutualFund' | 'Index' | 'Crypto' | 'Unknown';
+    marketCap?: number;
+    peRatio?: number;
+    forwardPE?: number;
+    pbRatio?: number;
+    bookValue?: number;
+    roe?: number;
+    profitMargin?: number;
+    operatingMargin?: number;
+    grossMargin?: number;
+    debtToEquity?: number;
+    freeCashFlow?: number;
+    dividendYield?: number;
+    payoutRatio?: number;
+    totalRevenue?: number;
+    netIncome?: number;
+    returnOnAssets?: number;
+    currentRatio?: number;
+    quickRatio?: number;
+    eps?: number;
+    forwardEps?: number;
+    enterpriseValue?: number;
+    beta?: number;
+    revenueGrowth?: number;
+    earningsGrowth?: number;
+}
+
+export type InstrumentType = 'Stock' | 'ETF' | 'MutualFund' | 'Index' | 'Crypto' | 'Unknown';

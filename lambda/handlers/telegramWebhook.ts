@@ -3,7 +3,8 @@ import { Telegraf } from 'telegraf';
 import { handleStart } from '../telegram/commands/handleStart';
 import { handleHelp } from '../telegram/commands/handleHelp';
 import { handleSummary } from '../telegram/commands/handleSummary';
-import { handleAISummary } from '../telegram/commands/handleAISummary';
+import { handleTechnicals } from '../telegram/commands/handleTechnicals';
+import { handleFundamentals } from '../telegram/commands/handleFundamentals';
 
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN!);
@@ -28,9 +29,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (arg) await handleSummary(bot, chatId, arg.toUpperCase());
             else await bot.telegram.sendMessage(chatId, '⚠️ Usage: /summary SYMBOL');
             break;
-        case '/aisummary':
-            if (arg) await handleAISummary(bot, chatId, arg.toUpperCase());
-            else await bot.telegram.sendMessage(chatId, '⚠️ Usage: /aisummary SYMBOL');
+        case '/technicals':
+            if (arg) await handleTechnicals(bot, chatId, arg.toUpperCase());
+            else await bot.telegram.sendMessage(chatId, '⚠️ Usage: /technicals SYMBOL');
+            break;
+        case '/fundamentals':
+            if (arg) await handleFundamentals(bot, chatId, arg.toUpperCase());
+            else await bot.telegram.sendMessage(chatId, '⚠️ Usage: /fundamentals SYMBOL');
             break;
         default:
             await bot.telegram.sendMessage(chatId, '❓ Unknown command. Try /help');
