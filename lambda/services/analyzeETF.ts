@@ -9,7 +9,7 @@ import chalk from 'chalk';
 export async function analyzeETF(symbol: string): Promise<StrategyResult> {
     console.log(`📊 Analyzing ${symbol} for swing trade using backtested strategy...`);
 
-    const rawData = await fetchHistoricalData(symbol, STRATEGY_SETTINGS.backtestDays); // Slightly longer data for better signal
+    const rawData = await fetchHistoricalData(symbol, STRATEGY_SETTINGS.backtestDays); // Use 365 days of data for backtesting
     if (!rawData.length) throw new Error(`No data found for ${symbol}`);
 
     const data = calculateIndicators(

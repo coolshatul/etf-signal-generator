@@ -5,17 +5,27 @@ export async function handleStart(bot: Telegraf<any>, chatId: number) {
     const startText = `
 👋 *Welcome to ETF Swing Bot!*
 
-I help you analyze Indian ETFs and generate swing trading signals based on backtested strategies.
+I help you analyze Indian ETFs and Stocks by providing technical, fundamental, and sentiment-based analysis, along with swing trading signals.
 
-Try one of the commands below to get started:
+📌 Available Commands:
 
-📊 /summary NIFTYBEES - Get latest signal + indicators  
-🤖 /technicals NIFTYBEES - Get AI-powered technicals analysis  
-📈 /fundamentals INFY - Get AI-powered fundamental analysis for Stocks
-🆘 /help - See full command list
+📊 /summary NIFTYBEES  
+Get the latest signal + technical indicators.
+
+🤖 /technicals NIFTYBEES  
+Get AI-powered technical analysis for an ETF or Stock.
+
+📈 /fundamentals INFY  
+Get AI-powered fundamental analysis for Indian Stocks.
+
+📰 /news INFY 5
+Get sentiment analysis from latest news headlines (optional limit, max 20).
+
+🆘 /help  
+See the full command list.
 
 —
-⚠️ This bot is for educational purposes only. Always do your own research.
+⚠️ This bot is for educational purposes only. Please do your own research before making any investment decisions.
 `.trim();
 
     await sendMessage(bot, chatId, startText);
