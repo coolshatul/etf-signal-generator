@@ -122,9 +122,10 @@ ${MESSAGES.DISCLAIMER}
 🚀 *Bullish Stocks Alert* 🚀
 📅 *Date:* ${today}
 📊 *Analysis:* Nifty50 Stocks
-
 ${MESSAGES.SEPARATOR}
-📈 *Found ${bullishResults.length} Bullish Stock(s) based on [Daily Close > 2 days ago Close] logic*
+📈 *Found ${bullishResults.length} Bullish Stock(s)*
+*Based on: Daily Close > 2 days ago Close*
+${MESSAGES.SEPARATOR}
 
 `;
 
@@ -135,12 +136,13 @@ ${MESSAGES.SEPARATOR}
 
     topStocks.forEach((stock, index) => {
         const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
-        message += `
-${index + 1}. *${stock.symbol}* [tradingview link 📊](${tvLink}) (Rating: ${stock.rating}/8)
+        message += `${index + 1}. **${stock.symbol}** (Rating: ${stock.rating}/8)
    📍 Signals: ${stock.signals.join(', ')}
-   🛡️ Stop Loss: ₹${stock.stopLoss.toFixed(2)} (${stock.stopLossPercent.toFixed(1)}%)
-   🎯 Target: ₹${stock.target.toFixed(2)} (+${stock.targetPercent.toFixed(1)}%)
-   📊 Risk/Reward: ${stock.riskRewardRatio.toFixed(1)}:1
+   🛡️ Stop Loss: ₹\`${stock.stopLoss.toFixed(2)}\` (\`${stock.stopLossPercent.toFixed(1)}%\`)
+   🎯 Target: ₹\`${stock.target.toFixed(2)}\` (+\`${stock.targetPercent.toFixed(1)}%\`)
+   📊 Risk/Reward: \`${stock.riskRewardRatio.toFixed(1)}\`:1
+   📈 [View Chart](${tvLink})
+
 `;
     });
 
@@ -190,9 +192,9 @@ ${MESSAGES.DISCLAIMER}
 📊 *EMA36 Analysis Alert* 📊
 📅 *Date:* ${today}
 📈 *Analysis:* Nifty50 Stocks (36-week EMA on Weekly Candles)
-
 ${MESSAGES.SEPARATOR}
 📉 *Found ${ema36Results.length} Stock(s) Approaching EMA36 Breakout*
+${MESSAGES.SEPARATOR}
 
 `;
 
@@ -200,9 +202,12 @@ ${MESSAGES.SEPARATOR}
     const displayStocks = ema36Results.slice(0, TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY);
     displayStocks.forEach((stock, index) => {
         const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
-        message += `${index + 1}. *${stock.symbol}* [tradingview link 📊](${tvLink})\n`;
-        message += `   💰 LTP: ₹${stock.ltp.toFixed(2)} | EMA36: ₹${stock.ema36.toFixed(2)}\n`;
-        message += `   📊 Diff: ${stock.percentDiff.toFixed(2)}%\n\n`;
+        message += `${index + 1}. **${stock.symbol}**
+   💰 LTP: ₹\`${stock.ltp.toFixed(2)}\` | EMA36: ₹\`${stock.ema36.toFixed(2)}\`
+   📊 Diff: \`${stock.percentDiff.toFixed(2)}%\`
+   📈 [View Chart](${tvLink})
+
+`;
     });
 
     if (ema36Results.length > TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY) {
