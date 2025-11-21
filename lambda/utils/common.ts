@@ -16,6 +16,18 @@ export const API_CONFIG = {
     CONCURRENCY_LIMIT: 5  // Maximum concurrent API calls
 };
 
+export const TELEGRAM_CONFIG = {
+    MAX_MESSAGE_LENGTH: 4096,
+    MAX_STOCKS_DISPLAY: 10,
+    RETRY_ATTEMPTS: 3,
+    RETRY_DELAY_MS: 1000
+};
+
+export const MESSAGES = {
+    DISCLAIMER: '⚠️ _This is not financial advice. Always do your own research._',
+    SEPARATOR: '━━━━━━━━━━━━━━━━━━'
+};
+
 /**
  * Delays execution for the specified milliseconds
  */

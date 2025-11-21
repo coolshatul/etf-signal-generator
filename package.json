@@ -34,6 +34,7 @@
     "@aws-cdk/aws-iam": "^1.203.0",
     "@aws-cdk/aws-lambda": "^1.203.0",
     "@types/aws-lambda": "^8.10.150",
+    "@types/nodemailer": "^7.0.4",
     "aws-cdk-lib": "^2.202.0",
     "constructs": "^10.4.2",
     "esbuild": "^0.25.5",

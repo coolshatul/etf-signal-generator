@@ -22,7 +22,12 @@ export class EtfStack extends Stack {
             timeout: Duration.seconds(30),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
-                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? ''
+                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
+                EMAIL_SERVICE: process.env.EMAIL_SERVICE ?? '',
+                EMAIL_USER: process.env.EMAIL_USER ?? '',
+                EMAIL_PASS: process.env.EMAIL_PASS ?? '',
+                EMAIL_FROM: process.env.EMAIL_FROM ?? '',
+                EMAIL_TO: process.env.EMAIL_TO ?? ''
             },
         });
 
@@ -44,7 +49,12 @@ export class EtfStack extends Stack {
             timeout: Duration.seconds(30),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
-                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? ''
+                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
+                EMAIL_SERVICE: process.env.EMAIL_SERVICE ?? '',
+                EMAIL_USER: process.env.EMAIL_USER ?? '',
+                EMAIL_PASS: process.env.EMAIL_PASS ?? '',
+                EMAIL_FROM: process.env.EMAIL_FROM ?? '',
+                EMAIL_TO: process.env.EMAIL_TO ?? ''
             },
         });
 

@@ -1,5 +1,6 @@
 import { analyzeNifty50Bullish } from '../services/analyzeNifty50Bullish';
 import { sendBullishStocksAlert } from '../alerts/telegram';
+import { sendBullishStocksEmail } from '../alerts/email';
 // import { logToMongo } from '../db/mongo'; // Optional
 
 
@@ -11,6 +12,9 @@ export const handler = async (): Promise<void> => {
 
         // Send Telegram Alert
         await sendBullishStocksAlert(bullishResults);
+
+        // Send Email Alert
+        await sendBullishStocksEmail(bullishResults);
 
         // Log to DB (optional)
         // await logToMongo(bullishResults);

@@ -1,6 +1,7 @@
 import { Telegraf } from 'telegraf';
 import * as dotenv from 'dotenv';
 import { BullishStockResult, EMA36Result } from '../types/index.js';
+import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
 
 dotenv.config();
 
@@ -8,18 +9,6 @@ const token = process.env.TELEGRAM_TOKEN!;
 const chatId = process.env.TELEGRAM_CHAT_ID!;
 const bot = new Telegraf(token);
 
-// Constants
-const TELEGRAM_CONFIG = {
-    MAX_MESSAGE_LENGTH: 4096,
-    MAX_STOCKS_DISPLAY: 10,
-    RETRY_ATTEMPTS: 3,
-    RETRY_DELAY_MS: 1000
-};
-
-const MESSAGES = {
-    DISCLAIMER: '⚠️ _This is not financial advice. Always do your own research._',
-    SEPARATOR: '━━━━━━━━━━━━━━━━━━'
-};
 
 // Helper functions
 function getCurrentDate(): string {
