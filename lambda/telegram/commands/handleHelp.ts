@@ -7,11 +7,7 @@ export async function handleHelp(bot: Telegraf<any>, chatId: number) {
 
 Here are the available commands you can use:
 
-📊 /summary SYMBOL  
-Get the latest trading signal and key technical indicators for Indian ETFs or Stocks.  
-*Example:* /summary NIFTYBEES
-
-🤖 /technicals SYMBOL  
+🤖 /technicals SYMBOL
 Receive an AI-powered technical analysis based on common indicators like EMA, RSI, MACD, etc.  
 *Example:* /technicals NIFTYBEES
 

@@ -30,31 +30,7 @@ export interface StrategySettings {
     backtestDays: number;
 }
 
-// Result of analyzeETF()
-export interface StrategyResult {
-    symbol: string;
-    date: string;
-    price: number;
-    rsi: number;
-    emaFast: number;
-    emaSlow: number;
-    signal: 'BUY' | 'SELL' | 'HOLD';
-    reason: string;
 
-    // New optional fields
-    lastTrade?: {
-        type: 'BUY' | 'SELL' | 'HOLD';
-        date: string;
-        price: number;
-        changeSince?: string; // e.g., "+2.15%"
-    };
-    backtestStats?: {
-        totalTrades: number;
-        totalProfit: string;
-        annualReturn: string;
-        winRate: string;
-    };
-}
 
 export interface FundamentalData {
     symbol: string;
@@ -86,3 +62,19 @@ export interface FundamentalData {
 }
 
 export type InstrumentType = 'Stock' | 'ETF' | 'MutualFund' | 'Index' | 'Crypto' | 'Unknown';
+
+// Result for bullish stock analysis
+export interface BullishStockResult {
+    symbol: string;
+    isBullish: boolean;
+    rating: number;
+    signals: string[];
+    stopLoss: number;
+    target: number;
+    stopLossPercent: number;
+    targetPercent: number;
+    riskRewardRatio: number;
+    swingLow: number;
+    swingHigh: number;
+    baseStopLevel: number;
+}

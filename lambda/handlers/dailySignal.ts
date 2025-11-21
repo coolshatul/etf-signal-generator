@@ -1,27 +1,24 @@
-import { analyzeETF } from '../services/analyzeETF';
-import { sendTelegramAlert } from '../alerts/telegram';
-import { SUPPORTED_ETFS } from '../config/settings';
+import { analyzeNifty50Bullish } from '../services/analyzeNifty50Bullish';
+import { sendBullishStocksAlert } from '../alerts/telegram';
 // import { logToMongo } from '../db/mongo'; // Optional
 
 
 export const handler = async (): Promise<void> => {
-    console.log('📡 Starting daily ETF signal scan...');
+    console.log('📡 Starting daily Nifty50 bullish stocks scan...');
 
-    for (const symbol of SUPPORTED_ETFS) {
-        try {
-            const result = await analyzeETF(symbol);
+    try {
+        const bullishResults = await analyzeNifty50Bullish();
 
-            // Send Telegram Alert
-            await sendTelegramAlert(result);
+        // Send Telegram Alert
+        await sendBullishStocksAlert(bullishResults);
 
-            // Log to DB (optional)
-            // await logToMongo(result);
+        // Log to DB (optional)
+        // await logToMongo(bullishResults);
 
-            console.log(`✅ Completed signal check for ${symbol}`);
-        } catch (err) {
-            console.error(`❌ Error analyzing ${symbol}:`, err);
-        }
+        console.log(`✅ Completed bullish stocks analysis. Found ${bullishResults.length} bullish stocks.`);
+    } catch (err) {
+        console.error('❌ Error analyzing Nifty50 stocks:', err);
     }
 
-    console.log('🎯 All ETF signals processed.');
+    console.log('🎯 Nifty50 bullish stocks analysis completed.');
 };

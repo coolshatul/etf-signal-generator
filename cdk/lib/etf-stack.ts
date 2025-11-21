@@ -22,8 +22,7 @@ export class EtfStack extends Stack {
             timeout: Duration.seconds(30),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
-                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
-                MONGO_URI: process.env.MONGO_URI ?? '',
+                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? ''
             },
         });
 
@@ -37,7 +36,7 @@ export class EtfStack extends Stack {
             targets: [new targets.LambdaFunction(dailySignalLambda)],
         });
 
-        // 🤖 Telegram Webhook Lambda (for /summary NIFTYBEES etc.)
+        // 🤖 Telegram Webhook Lambda
         const telegramWebhookLambda = new NodejsFunction(this, 'TelegramWebhookLambda', {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/telegramWebhook.ts'),

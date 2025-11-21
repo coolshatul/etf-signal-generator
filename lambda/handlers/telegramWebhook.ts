@@ -2,7 +2,6 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { Telegraf } from 'telegraf';
 import { handleStart } from '../telegram/commands/handleStart';
 import { handleHelp } from '../telegram/commands/handleHelp';
-import { handleSummary } from '../telegram/commands/handleSummary';
 import { handleTechnicals } from '../telegram/commands/handleTechnicals';
 import { handleFundamentals } from '../telegram/commands/handleFundamentals';
 import { handleNews } from '../telegram/commands/handleNews';
@@ -27,10 +26,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         case '/help':
             await handleHelp(bot, chatId);
             break;
-        case '/summary':
-            if (symbolArg) await handleSummary(bot, chatId, symbolArg.toUpperCase());
-            else await bot.telegram.sendMessage(chatId, '⚠️ Usage: /summary SYMBOL');
-            break;
+
         case '/technicals':
             if (symbolArg) await handleTechnicals(bot, chatId, symbolArg.toUpperCase());
             else await bot.telegram.sendMessage(chatId, '⚠️ Usage: /technicals SYMBOL');
