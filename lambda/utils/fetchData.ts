@@ -8,15 +8,22 @@ function withNSE(symbol: string) {
         : `${symbol.trim().toUpperCase()}.NS`;
 }
 
-// Fetch historical daily data for a given symbol and number of past days
-export async function fetchHistoricalData(symbol: string, days: number): Promise<Candle[]> {
+// Fetch historical data for a given symbol and number of past days/weeks
+export async function fetchHistoricalData(symbol: string, days: number, interval: '1d' | '1wk' = '1d'): Promise<Candle[]> {
     const to = new Date();
     const from = new Date(to);
-    from.setDate(to.getDate() - days);
+
+    if (interval === '1d') {
+        from.setDate(to.getDate() - days);
+    } else if (interval === '1wk') {
+        // For weekly data, convert days to weeks (roughly)
+        const weeks = Math.ceil(days / 7);
+        from.setDate(to.getDate() - (weeks * 7));
+    }
 
     const queryOptions = {
         period1: from.toISOString(),
-        interval: '1d' as const,
+        interval: interval as '1d' | '1wk',
     };
 
     try {

@@ -78,3 +78,12 @@ export interface BullishStockResult {
     swingHigh: number;
     baseStopLevel: number;
 }
+
+// Result for EMA36 analysis
+export interface EMA36Result {
+    symbol: string;
+    ltp: number;        // Last Traded Price
+    ema36: number;      // 36-period EMA value
+    status: 'APPROACHING_BREAKOUT';
+    percentDiff: number; // Percentage difference from EMA
+}

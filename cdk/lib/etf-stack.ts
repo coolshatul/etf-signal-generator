@@ -36,6 +36,28 @@ export class EtfStack extends Stack {
             targets: [new targets.LambdaFunction(dailySignalLambda)],
         });
 
+        // 🟠 EMA36 signal Lambda function
+        const ema36SignalLambda = new NodejsFunction(this, 'EMA36SignalLambda', {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMA36.ts'),
+            handler: 'handler',
+            timeout: Duration.seconds(30),
+            environment: {
+                TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
+                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? ''
+            },
+        });
+
+        // ⏰ Schedule the EMA36 Lambda to run at 9:15 AM IST (UTC+5:30 = 3:45 AM UTC)
+        new events.Rule(this, 'EMA36SignalSchedule', {
+            schedule: events.Schedule.cron({
+                minute: '45',
+                hour: '3',
+                weekDay: 'MON-FRI', // Weekdays only
+            }),
+            targets: [new targets.LambdaFunction(ema36SignalLambda)],
+        });
+
         // 🤖 Telegram Webhook Lambda
         const telegramWebhookLambda = new NodejsFunction(this, 'TelegramWebhookLambda', {
             runtime: lambda.Runtime.NODEJS_20_X,
