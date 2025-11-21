@@ -1,23 +1,13 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { EMA36Result } from '../types';
 import { EMA } from 'technicalindicators';
-
-// Nifty50 symbols (excluding NIFTY index)
-const nifty50Symbols = [
-    'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK', 'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV',
-    'BEL', 'BHARTIARTL', 'CIPLA', 'COALINDIA', 'DRREDDY', 'EICHERMOT', 'ETERNAL', 'GRASIM', 'HCLTECH',
-    'HDFCBANK', 'HDFCLIFE', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK', 'INDIGO', 'INFY', 'ITC', 'JIOFIN',
-    'JSWSTEEL', 'KOTAKBANK', 'LT', 'M&M', 'MARUTI', 'MAXHEALTH', 'NESTLEIND', 'NTPC', 'ONGC',
-    'POWERGRID', 'RELIANCE', 'SBILIFE', 'SHRIRAMFIN', 'SBIN', 'SUNPHARMA', 'TCS', 'TATACONSUM', 'TMPV',
-    'TATASTEEL', 'TECHM', 'TITAN', 'TRENT', 'ULTRACEMCO', 'WIPRO'
-];
+import { nifty50Symbols, processWithConcurrency } from '../utils/common';
 
 // Configuration
 const CONFIG = {
     EMA_PERIOD: 36,
     MIN_DATA_POINTS: 50,  // Need at least 50 weeks for reliable EMA
-    APPROACHING_BREAKOUT_THRESHOLD: 2, // Max distance below EMA for approaching breakout (2%)
-    API_DELAY_MS: 100  // Delay between API calls
+    APPROACHING_BREAKOUT_THRESHOLD: 2 // Max distance below EMA for approaching breakout (2%)
 };
 
 /**
@@ -79,20 +69,11 @@ async function analyzeEMA36Stock(symbol: string): Promise<EMA36Result | null> {
 export async function analyzeNifty50EMA36(): Promise<EMA36Result[]> {
     console.log('📊 Analyzing Nifty50 stocks for EMA36 signals...');
 
-    const results: EMA36Result[] = [];
+    // Analyze each stock with concurrency control to avoid rate limits
+    const allResults = await processWithConcurrency(nifty50Symbols, analyzeEMA36Stock);
 
-    // Analyze each stock with delay to avoid rate limits
-    for (const symbol of nifty50Symbols) {
-        const result = await analyzeEMA36Stock(symbol);
-        if (result) {
-            results.push(result);
-        }
-
-        // Delay between API calls
-        if (CONFIG.API_DELAY_MS > 0) {
-            await new Promise(resolve => setTimeout(resolve, CONFIG.API_DELAY_MS));
-        }
-    }
+    // Filter out null results
+    const results = allResults.filter((result): result is EMA36Result => result !== null);
 
     console.log(`✅ Found ${results.length} stocks with EMA36 signals out of ${nifty50Symbols.length}`);
 

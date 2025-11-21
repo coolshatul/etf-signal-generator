@@ -2,6 +2,7 @@ import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { BullishStockResult } from '../types';
 import { EMA, RSI, MACD, ATR } from 'technicalindicators';
+import { nifty50Symbols, processWithConcurrency } from '../utils/common';
 
 // Configuration constants
 const CONFIG = {
@@ -11,19 +12,8 @@ const CONFIG = {
     MIN_DATA_POINTS: 100,
     RSI_MIN: 40,
     RSI_MAX: 60,
-    BULLISH_THRESHOLD: 5,
-    API_DELAY_MS: 100  // Delay between API calls to avoid rate limits
+    BULLISH_THRESHOLD: 5
 };
-
-// Nifty50 symbols (excluding NIFTY index)
-const nifty50Symbols = [
-    'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK', 'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV',
-    'BEL', 'BHARTIARTL', 'CIPLA', 'COALINDIA', 'DRREDDY', 'EICHERMOT', 'ETERNAL', 'GRASIM', 'HCLTECH',
-    'HDFCBANK', 'HDFCLIFE', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK', 'INDIGO', 'INFY', 'ITC', 'JIOFIN',
-    'JSWSTEEL', 'KOTAKBANK', 'LT', 'M&M', 'MARUTI', 'MAXHEALTH', 'NESTLEIND', 'NTPC', 'ONGC',
-    'POWERGRID', 'RELIANCE', 'SBILIFE', 'SHRIRAMFIN', 'SBIN', 'SUNPHARMA', 'TCS', 'TATACONSUM', 'TMPV',
-    'TATASTEEL', 'TECHM', 'TITAN', 'TRENT', 'ULTRACEMCO', 'WIPRO'
-];
 
 // Helper function for default response
 function getDefaultResponse(symbol: string): BullishStockResult {
@@ -231,18 +221,8 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
 export async function analyzeNifty50Bullish(): Promise<BullishStockResult[]> {
     console.log('📊 Analyzing Nifty50 stocks for bullish signals...');
 
-    const results: BullishStockResult[] = [];
-
-    // Analyze each stock with delay to avoid rate limits
-    for (const symbol of nifty50Symbols) {
-        const result = await analyzeBullishStock(symbol);
-        results.push(result);
-
-        // Delay between API calls
-        if (CONFIG.API_DELAY_MS > 0) {
-            await new Promise(resolve => setTimeout(resolve, CONFIG.API_DELAY_MS));
-        }
-    }
+    // Analyze each stock with concurrency control to avoid rate limits
+    const results = await processWithConcurrency(nifty50Symbols, analyzeBullishStock);
 
     // Filter to bullish stocks only
     const bullishResults = results.filter(r => r.isBullish);
