@@ -1,12 +1,23 @@
 import { Groq } from 'groq-sdk';
 import { FundamentalData } from '../../types';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let groq: Groq | null = null;
+
+function getGroqClient(): Groq {
+    if (!groq) {
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) {
+            throw new Error('GROQ_API_KEY environment variable is not set');
+        }
+        groq = new Groq({ apiKey });
+    }
+    return groq;
+}
 
 export async function askGroqForFundamentalAnalysis(symbol: string, data: FundamentalData): Promise<string> {
     const formattedData = Object.entries(data).map(([key, val]) => `${key}: ${val}`).join('\n');
 
-    const chatCompletion = await groq.chat.completions.create({
+    const chatCompletion = await getGroqClient().chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         temperature: 1,
         max_tokens: 800,

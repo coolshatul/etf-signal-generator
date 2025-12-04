@@ -5,6 +5,9 @@ import { handleHelp } from '../telegram/commands/handleHelp';
 import { handleTechnicals } from '../telegram/commands/handleTechnicals';
 import { handleFundamentals } from '../telegram/commands/handleFundamentals';
 import { handleNews } from '../telegram/commands/handleNews';
+import { handleSubscribe } from '../telegram/commands/handleSubscribe';
+import { handleUnsubscribe } from '../telegram/commands/handleUnsubscribe';
+import { handleSubscribers } from '../telegram/commands/handleSubscribers';
 
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN!);
@@ -25,6 +28,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             break;
         case '/help':
             await handleHelp(bot, chatId);
+            break;
+        case '/subscribe':
+            await handleSubscribe(bot, chatId, message.from);
+            break;
+        case '/unsubscribe':
+            await handleUnsubscribe(bot, chatId);
+            break;
+        case '/subscribers':
+            await handleSubscribers(bot, chatId);
             break;
 
         case '/technicals':

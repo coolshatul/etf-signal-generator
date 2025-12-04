@@ -2,6 +2,8 @@ import { Telegraf } from 'telegraf';
 import * as dotenv from 'dotenv';
 import { BullishStockResult, EMA36Result } from '../types/index.js';
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
+import { connectToDatabase } from '../db/connection';
+import { Subscriber } from '../db/models';
 
 dotenv.config();
 
@@ -85,6 +87,67 @@ async function sendLongMessage(fullMessage: string): Promise<void> {
     }
 }
 
+async function getActiveSubscribers(): Promise<number[]> {
+    try {
+        await connectToDatabase();
+        const subscribers = await Subscriber.find({ isActive: true }).select('chatId');
+        return subscribers.map(sub => sub.chatId);
+    } catch (error) {
+        console.error('Error getting active subscribers:', error);
+        // Fallback to original chat ID if database fails
+        return [parseInt(chatId)];
+    }
+}
+
+async function broadcastMessage(message: string, options: any = {}): Promise<void> {
+    const subscriberChatIds = await getActiveSubscribers();
+    console.log(`📢 Broadcasting to ${subscriberChatIds.length} subscribers`);
+
+    const messages = splitMessage(message);
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const chatId of subscriberChatIds) {
+        for (const msg of messages) {
+            for (let attempt = 1; attempt <= TELEGRAM_CONFIG.RETRY_ATTEMPTS; attempt++) {
+                try {
+                    await bot.telegram.sendMessage(chatId, msg, {
+                        parse_mode: 'Markdown',
+                        link_preview_options: { is_disabled: true },
+                        ...options
+                    });
+                    successCount++;
+                    break; // Success, move to next subscriber
+                } catch (err) {
+                    console.error(`❌ Broadcast attempt ${attempt} failed for chat ${chatId}:`, err);
+                    if (attempt < TELEGRAM_CONFIG.RETRY_ATTEMPTS) {
+                        await new Promise(resolve => setTimeout(resolve, TELEGRAM_CONFIG.RETRY_DELAY_MS));
+                    } else {
+                        failureCount++;
+                        // If it's the original admin chat, mark as inactive
+                        if (chatId === parseInt(process.env.TELEGRAM_CHAT_ID || '0')) {
+                            console.error('❌ Failed to send to admin chat - check bot configuration');
+                        } else {
+                            // Optionally mark subscriber as inactive if we can't reach them
+                            try {
+                                await Subscriber.findOneAndUpdate(
+                                    { chatId },
+                                    { isActive: false, unsubscribedAt: new Date() }
+                                );
+                                console.log(`📝 Marked subscriber ${chatId} as inactive due to delivery failure`);
+                            } catch (dbError) {
+                                console.error('Error updating subscriber status:', dbError);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    console.log(`📬 Broadcast complete: ${successCount} successful, ${failureCount} failed`);
+}
+
 export async function sendBullishStocksAlert(bullishResults: BullishStockResult[]): Promise<void> {
     validateInputs(bullishResults, 'bullish');
 
@@ -100,7 +163,7 @@ ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
         `.trim();
 
-        await sendMessageWithRetry(noSignalMessage);
+        await broadcastMessage(noSignalMessage);
         console.log('📬 Telegram alert sent: No bullish signals');
         return;
     }
@@ -151,7 +214,7 @@ ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
     `.trim();
 
-    await sendLongMessage(message);
+    await broadcastMessage(message);
     console.log(`📬 Telegram alert sent for ${bullishResults.length} bullish stocks`);
 }
 
@@ -170,7 +233,7 @@ ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
         `.trim();
 
-        await sendMessageWithRetry(noSignalMessage);
+        await broadcastMessage(noSignalMessage);
         console.log('📬 Telegram alert sent: No EMA36 signals');
         return;
     }
@@ -212,6 +275,6 @@ ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
     `.trim();
 
-    await sendLongMessage(message);
+    await broadcastMessage(message);
     console.log(`📬 Telegram alert sent for ${ema36Results.length} EMA36 signals`);
 }

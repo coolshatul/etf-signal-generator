@@ -7,6 +7,11 @@ export async function handleHelp(bot: Telegraf<any>, chatId: number) {
 
 Here are the available commands you can use:
 
+📢 *Signal Subscriptions:*
+🔔 /subscribe - Subscribe to receive daily trading signals
+🔕 /unsubscribe - Unsubscribe from trading signals
+👥 /subscribers - View subscriber statistics (admin only)
+
 🤖 /technicals SYMBOL
 Receive an AI-powered technical analysis based on common indicators like EMA, RSI, MACD, etc.  
 *Example:* /technicals NIFTYBEES
@@ -24,6 +29,7 @@ Fetch latest news headlines and get a sentiment analysis summary.
 - Use NSE symbols (e.g., INFY for Infosys, NIFTYBEES for ETFs).  
 - This bot is focused on Indian markets (NSE-listed assets).  
 - Sentiment analysis & AI summaries are experimental.
+- Trading signals are sent weekdays at 9:00 AM IST.
 
 —
 ⚠️ *Disclaimer:* This bot is for educational purposes only. Always verify data and consult financial experts before investing.

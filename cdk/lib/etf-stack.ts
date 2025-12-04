@@ -23,6 +23,7 @@ export class EtfStack extends Stack {
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
+                MONGODB_URI: process.env.MONGODB_URI ?? '',
                 EMAIL_SERVICE: process.env.EMAIL_SERVICE ?? '',
                 EMAIL_USER: process.env.EMAIL_USER ?? '',
                 EMAIL_PASS: process.env.EMAIL_PASS ?? '',
@@ -50,6 +51,7 @@ export class EtfStack extends Stack {
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
+                MONGODB_URI: process.env.MONGODB_URI ?? '',
                 EMAIL_SERVICE: process.env.EMAIL_SERVICE ?? '',
                 EMAIL_USER: process.env.EMAIL_USER ?? '',
                 EMAIL_PASS: process.env.EMAIL_PASS ?? '',
@@ -76,6 +78,8 @@ export class EtfStack extends Stack {
             timeout: Duration.seconds(10),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
+                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
+                MONGODB_URI: process.env.MONGODB_URI ?? '',
                 GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
             },
         });
