@@ -19,7 +19,7 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignal.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(30),
+            timeout: Duration.seconds(60),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
@@ -49,7 +49,7 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMA36.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(30),
+            timeout: Duration.seconds(60),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
@@ -98,7 +98,7 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/telegramWebhook.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(10),
+            timeout: Duration.seconds(30),
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
