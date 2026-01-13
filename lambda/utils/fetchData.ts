@@ -3,9 +3,11 @@ const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey", 'ripHis
 import { Candle, InstrumentType } from '../types';
 
 function withNSE(symbol: string) {
-    return symbol.trim().toUpperCase().endsWith('.NS')
-        ? symbol.trim().toUpperCase()
-        : `${symbol.trim().toUpperCase()}.NS`;
+  const s = symbol.trim().toUpperCase();
+  if (s.startsWith('^') || s.endsWith('.NS')) {
+    return s;
+  }
+  return `${s}.NS`;
 }
 
 export async function fetchHistoricalData(
@@ -55,47 +57,47 @@ export async function fetchHistoricalData(
 }
 
 export async function fetchInstrumentType(symbol: string): Promise<InstrumentType> {
-    const quoteTypeResult = await yahooFinance.quoteSummary(withNSE(symbol), {
-        modules: ['quoteType'],
-    });
+  const quoteTypeResult = await yahooFinance.quoteSummary(withNSE(symbol), {
+    modules: ['quoteType'],
+  });
 
-    const qt = quoteTypeResult.quoteType;
-    const rawType = qt?.quoteType ?? 'UNKNOWN';
-    const name = `${qt?.shortName ?? ''} ${qt?.longName ?? ''}`.toLowerCase();
+  const qt = quoteTypeResult.quoteType;
+  const rawType = qt?.quoteType ?? 'UNKNOWN';
+  const name = `${qt?.shortName ?? ''} ${qt?.longName ?? ''}`.toLowerCase();
 
-    if (rawType === 'ETF') return 'ETF';
-    if (rawType === 'MUTUALFUND') return 'MutualFund';
-    if (rawType === 'INDEX') return 'Index';
-    if (rawType === 'CRYPTOCURRENCY') return 'Crypto';
-    if (rawType === 'EQUITY') {
-        if (
-            name.includes('etf') ||
-            name.includes('bees') ||
-            name.includes('fund') ||
-            name.includes('index')
-        ) {
-            return 'ETF';
-        } else {
-            return 'Stock';
-        }
+  if (rawType === 'ETF') return 'ETF';
+  if (rawType === 'MUTUALFUND') return 'MutualFund';
+  if (rawType === 'INDEX') return 'Index';
+  if (rawType === 'CRYPTOCURRENCY') return 'Crypto';
+  if (rawType === 'EQUITY') {
+    if (
+      name.includes('etf') ||
+      name.includes('bees') ||
+      name.includes('fund') ||
+      name.includes('index')
+    ) {
+      return 'ETF';
+    } else {
+      return 'Stock';
     }
-    return 'Unknown';
+  }
+  return 'Unknown';
 }
 
 export async function fetchSummaryDetail(symbol: string) {
-    return yahooFinance.quoteSummary(withNSE(symbol), {
-        modules: ['summaryDetail'],
-    });
+  return yahooFinance.quoteSummary(withNSE(symbol), {
+    modules: ['summaryDetail'],
+  });
 }
 
 export async function fetchFullFinancialData(symbol: string) {
-    return yahooFinance.quoteSummary(withNSE(symbol), {
-        modules: [
-            'financialData',
-            'defaultKeyStatistics',
-            'summaryDetail',
-            'incomeStatementHistory',
-            'cashflowStatementHistory',
-        ],
-    });
+  return yahooFinance.quoteSummary(withNSE(symbol), {
+    modules: [
+      'financialData',
+      'defaultKeyStatistics',
+      'summaryDetail',
+      'incomeStatementHistory',
+      'cashflowStatementHistory',
+    ],
+  });
 }
