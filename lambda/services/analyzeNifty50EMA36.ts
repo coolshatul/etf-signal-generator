@@ -1,6 +1,6 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { EMA36Result } from '../types';
-import { EMA } from 'technicalindicators';
+import { calculateIndicators } from '../utils/indicators';
 import { nifty50Symbols, processWithConcurrency } from '../utils/common';
 
 // Configuration
@@ -22,18 +22,15 @@ async function analyzeEMA36Stock(symbol: string): Promise<EMA36Result | null> {
             return null;
         }
 
-        // Extract closing prices
-        const closes = rawData.map(d => d.close);
+        // Calculate indicators using unified utility
+        const dataWithIndicators = calculateIndicators(rawData);
+        const lastCandle = dataWithIndicators[dataWithIndicators.length - 1];
 
-        // Calculate 36-period EMA on all available weekly data (should be sufficient)
-        const ema36Values = EMA.calculate({ period: CONFIG.EMA_PERIOD, values: closes });
+        const { close: ltp, ema36 } = lastCandle;
 
-        if (!ema36Values.length) {
+        if (!ema36) {
             return null;
         }
-
-        const ema36 = ema36Values[ema36Values.length - 1];
-        const ltp = closes[closes.length - 1];
 
         // Calculate percentage difference
         const percentDiff = ((ltp - ema36) / ema36) * 100;

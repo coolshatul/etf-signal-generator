@@ -1,7 +1,7 @@
 import { analyzeNifty50EMA36 } from '../services/analyzeNifty50EMA36';
 import { sendEMA36Alert } from '../alerts/telegram';
 import { sendEMA36Email } from '../alerts/email';
-// import { logToMongo } from '../db/mongo'; // Optional
+import { logEMA36Signals } from '../db/mongo';
 
 
 export const handler = async (): Promise<void> => {
@@ -16,8 +16,8 @@ export const handler = async (): Promise<void> => {
         // Send Email Alert
         await sendEMA36Email(ema36Results);
 
-        // Log to DB (optional)
-        // await logToMongo(ema36Results);
+        // Log to DB
+        await logEMA36Signals(ema36Results);
 
         console.log(`✅ Completed EMA36 analysis. Found ${ema36Results.length} signals.`);
     } catch (err) {

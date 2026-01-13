@@ -68,6 +68,7 @@ export interface BullishStockResult {
     symbol: string;
     isBullish: boolean;
     rating: number;
+    price: number;
     signals: string[];
     stopLoss: number;
     target: number;

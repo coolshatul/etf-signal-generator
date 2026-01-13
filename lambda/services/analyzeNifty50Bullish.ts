@@ -21,6 +21,7 @@ function getDefaultResponse(symbol: string): BullishStockResult {
         symbol,
         isBullish: false,
         rating: 0,
+        price: 0,
         signals: [],
         stopLoss: 0,
         target: 0,
@@ -30,49 +31,6 @@ function getDefaultResponse(symbol: string): BullishStockResult {
         swingLow: 0,
         swingHigh: 0,
         baseStopLevel: 0
-    };
-}
-
-// Function to calculate additional indicators
-function calculateAdditionalIndicators(closes: number[], highs: number[], lows: number[]) {
-    // Calculate EMAs
-    const ema10Values = EMA.calculate({ period: 10, values: closes });
-    const ema20Values = EMA.calculate({ period: 20, values: closes });
-    const ema50Values = EMA.calculate({ period: 50, values: closes });
-
-    const ema10 = ema10Values[ema10Values.length - 1];
-    const ema20 = ema20Values[ema20Values.length - 1];
-    const ema50 = ema50Values[ema50Values.length - 1];
-
-    const prevEMA20 = ema20Values[ema20Values.length - 2];
-    const prevEMA50 = ema50Values[ema50Values.length - 2];
-
-    // Calculate ATR
-    let atr = 0;
-    if (closes.length >= CONFIG.ATR_PERIOD + 1) {
-        const atrValues = ATR.calculate({ period: CONFIG.ATR_PERIOD, high: highs, low: lows, close: closes });
-        atr = atrValues[atrValues.length - 1] || 0;
-    }
-
-    // Calculate RSI and MACD
-    const rsiValues = RSI.calculate({ period: 14, values: closes });
-    const rsi = rsiValues[rsiValues.length - 1];
-
-    const macdResult = MACD.calculate({
-        values: closes,
-        fastPeriod: 12,
-        slowPeriod: 26,
-        signalPeriod: 9,
-        SimpleMAOscillator: false,
-        SimpleMASignal: false
-    });
-    const macdHistogram = macdResult[macdResult.length - 1].histogram;
-
-    return {
-        ema10, ema20, ema50, prevEMA20, prevEMA50, atr, rsi, macdHistogram,
-        lastClose: closes[closes.length - 1],
-        prevClose: closes[closes.length - 2],
-        prevPrevClose: closes.length >= 3 ? closes[closes.length - 3] : null
     };
 }
 
@@ -149,11 +107,6 @@ function evaluateBullish(indicators: any, swingLow: number, swingHigh: number) {
         signals.push('RSI in range and MACD positive');
     }
 
-    // // Add the 2-day check to signals since it's a prerequisite
-    // if (prevPrevClose !== null) {
-    //     signals.push('Price higher than 2 days ago');
-    // }
-
     const isBullish = rating >= CONFIG.BULLISH_THRESHOLD;
 
     return { isBullish, rating, signals };
@@ -168,41 +121,40 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
             return getDefaultResponse(symbol);
         }
 
-        // Calculate indicators using existing utils (for basic ones)
-        const dataWithIndicators = calculateIndicators(rawData, 14, 9, 21); // rsi, ema9, ema21
+        // Calculate indicators using unified utility
+        const dataWithIndicators = calculateIndicators(rawData);
+        const lastCandle = dataWithIndicators[dataWithIndicators.length - 1];
+        const prevCandle = dataWithIndicators[dataWithIndicators.length - 2];
+        const prevPrevCandle = dataWithIndicators.length >= 3 ? dataWithIndicators[dataWithIndicators.length - 3] : null;
 
-        // Extract arrays
-        const closes = rawData.map(d => d.close);
-        const highs = rawData.map(d => d.high);
-        const lows = rawData.map(d => d.low);
-
-        // Calculate additional indicators
-        const indicators = calculateAdditionalIndicators(closes, highs, lows);
+        // Extract necessary indicator values
+        const { close: lastClose, ema10, ema20, ema50, rsi, macdHistogram, atr } = lastCandle;
+        const { close: prevClose, ema20: prevEMA20, ema50: prevEMA50 } = prevCandle;
 
         // Early validation
-        if (indicators.lastClose <= 0 || indicators.prevClose <= 0) {
+        if (lastClose <= 0 || prevClose <= 0) {
             return getDefaultResponse(symbol);
         }
 
         // Calculate swing levels
-        const swingDays = Math.min(CONFIG.SWING_DAYS, rawData.length);
-        let swingLow, swingHigh;
-        if (swingDays < 2) {
-            swingLow = lows[lows.length - 1];
-            swingHigh = highs[highs.length - 1];
-        } else {
-            swingLow = Math.min(...lows.slice(-swingDays));
-            swingHigh = Math.max(...highs.slice(-swingDays));
-        }
+        const swingDays = Math.min(CONFIG.SWING_DAYS, dataWithIndicators.length);
+        const recentData = dataWithIndicators.slice(-swingDays);
+        const swingLow = Math.min(...recentData.map(d => d.low));
+        const swingHigh = Math.max(...recentData.map(d => d.high));
 
         // Calculate levels
-        const levels = calculateLevels(indicators.lastClose, swingLow, swingHigh, indicators.ema50, indicators.atr);
+        const levels = calculateLevels(lastClose, swingLow, swingHigh, ema50, atr);
 
         // Evaluate bullish conditions
+        const indicators = {
+            ema10, ema20, ema50, prevEMA20, prevEMA50, rsi, macdHistogram, lastClose, prevClose,
+            prevPrevClose: prevPrevCandle ? prevPrevCandle.close : null
+        };
         const bullishResult = evaluateBullish(indicators, swingLow, swingHigh);
 
         return {
             symbol,
+            price: lastClose,
             ...bullishResult,
             ...levels,
             swingLow,

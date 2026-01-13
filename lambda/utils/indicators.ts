@@ -1,11 +1,11 @@
-import { RSI, EMA, MACD, ATR, ADX, BollingerBands, } from 'technicalindicators';
+import { RSI, EMA, MACD, ATR, ADX, BollingerBands } from 'technicalindicators';
 import { Candle } from '../types';
 
 export function calculateIndicators(
     data: Candle[],
-    rsiPeriod: number,
-    emaFast: number,
-    emaSlow: number
+    rsiPeriod: number = 14,
+    emaFast: number = 9,
+    emaSlow: number = 21
 ): Candle[] {
     const closes = data.map(d => d.close);
     const highs = data.map(d => d.high);
@@ -13,8 +13,12 @@ export function calculateIndicators(
     const volumes = data.map(d => d.volume);
 
     const rsi = RSI.calculate({ period: rsiPeriod, values: closes });
-    const ema9 = EMA.calculate({ period: emaFast, values: closes });
-    const ema21 = EMA.calculate({ period: emaSlow, values: closes });
+    const ema9 = EMA.calculate({ period: 9, values: closes });
+    const ema10 = EMA.calculate({ period: 10, values: closes });
+    const ema20 = EMA.calculate({ period: 20, values: closes });
+    const ema21 = EMA.calculate({ period: 21, values: closes });
+    const ema36 = EMA.calculate({ period: 36, values: closes });
+    const ema50 = EMA.calculate({ period: 50, values: closes });
 
     const macd = MACD.calculate({
         fastPeriod: 12,
@@ -35,21 +39,40 @@ export function calculateIndicators(
     });
 
     // Attach all indicators to data
-    return data.map((d, i) => ({
-        ...d,
-        rsi: rsi[i - (data.length - rsi.length)] ?? null,
-        emaFast: ema9[i - (data.length - ema9.length)] ?? null,
-        emaSlow: ema21[i - (data.length - ema21.length)] ?? null,
-        macd: macd[i - (data.length - macd.length)]?.MACD ?? null,
-        macdSignal: macd[i - (data.length - macd.length)]?.signal ?? null,
-        atr: atr[i - (data.length - atr.length)] ?? null,
-        adx: adx[i - (data.length - adx.length)]?.adx ?? null,
-        bbUpper: bbands[i - (data.length - bbands.length)]?.upper ?? null,
-        bbLower: bbands[i - (data.length - bbands.length)]?.lower ?? null,
-        bbMiddle: bbands[i - (data.length - bbands.length)]?.middle ?? null,
-        avgVolume20:
-            i >= 19
-                ? volumes.slice(i - 19, i + 1).reduce((sum, v) => sum + v, 0) / 20
-                : null,
-    }));
+    return data.map((d, i) => {
+        const offsetRsi = data.length - rsi.length;
+        const offsetEma9 = data.length - ema9.length;
+        const offsetEma10 = data.length - ema10.length;
+        const offsetEma20 = data.length - ema20.length;
+        const offsetEma21 = data.length - ema21.length;
+        const offsetEma36 = data.length - ema36.length;
+        const offsetEma50 = data.length - ema50.length;
+        const offsetMacd = data.length - macd.length;
+        const offsetAtr = data.length - atr.length;
+        const offsetAdx = data.length - adx.length;
+        const offsetBbands = data.length - bbands.length;
+
+        return {
+            ...d,
+            rsi: i >= offsetRsi ? rsi[i - offsetRsi] : null,
+            ema9: i >= offsetEma9 ? ema9[i - offsetEma9] : null,
+            ema10: i >= offsetEma10 ? ema10[i - offsetEma10] : null,
+            ema20: i >= offsetEma20 ? ema20[i - offsetEma20] : null,
+            ema21: i >= offsetEma21 ? ema21[i - offsetEma21] : null,
+            ema36: i >= offsetEma36 ? ema36[i - offsetEma36] : null,
+            ema50: i >= offsetEma50 ? ema50[i - offsetEma50] : null,
+            macd: i >= offsetMacd ? macd[i - offsetMacd]?.MACD : null,
+            macdSignal: i >= offsetMacd ? macd[i - offsetMacd]?.signal : null,
+            macdHistogram: i >= offsetMacd ? macd[i - offsetMacd]?.histogram : null,
+            atr: i >= offsetAtr ? atr[i - offsetAtr] : null,
+            adx: i >= offsetAdx ? adx[i - offsetAdx]?.adx : null,
+            bbUpper: i >= offsetBbands ? bbands[i - offsetBbands]?.upper : null,
+            bbLower: i >= offsetBbands ? bbands[i - offsetBbands]?.lower : null,
+            bbMiddle: i >= offsetBbands ? bbands[i - offsetBbands]?.middle : null,
+            avgVolume20:
+                i >= 19
+                    ? volumes.slice(i - 19, i + 1).reduce((sum, v) => sum + v, 0) / 20
+                    : null,
+        };
+    });
 }
