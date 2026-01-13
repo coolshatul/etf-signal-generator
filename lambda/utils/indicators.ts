@@ -15,6 +15,7 @@ export function calculateIndicators(
     const rsi = RSI.calculate({ period: rsiPeriod, values: closes });
     const ema9 = EMA.calculate({ period: 9, values: closes });
     const ema10 = EMA.calculate({ period: 10, values: closes });
+    const ema15 = EMA.calculate({ period: 15, values: closes });
     const ema20 = EMA.calculate({ period: 20, values: closes });
     const ema21 = EMA.calculate({ period: 21, values: closes });
     const ema36 = EMA.calculate({ period: 36, values: closes });
@@ -46,6 +47,7 @@ export function calculateIndicators(
         const offsetRsi = data.length - rsi.length;
         const offsetEma9 = data.length - ema9.length;
         const offsetEma10 = data.length - ema10.length;
+        const offsetEma15 = data.length - ema15.length;
         const offsetEma20 = data.length - ema20.length;
         const offsetEma21 = data.length - ema21.length;
         const offsetEma36 = data.length - ema36.length;
@@ -62,6 +64,7 @@ export function calculateIndicators(
             rsi: i >= offsetRsi ? rsi[i - offsetRsi] : null,
             ema9: i >= offsetEma9 ? ema9[i - offsetEma9] : null,
             ema10: i >= offsetEma10 ? ema10[i - offsetEma10] : null,
+            ema15: i >= offsetEma15 ? ema15[i - offsetEma15] : null,
             ema20: i >= offsetEma20 ? ema20[i - offsetEma20] : null,
             ema21: i >= offsetEma21 ? ema21[i - offsetEma21] : null,
             ema36: i >= offsetEma36 ? ema36[i - offsetEma36] : null,

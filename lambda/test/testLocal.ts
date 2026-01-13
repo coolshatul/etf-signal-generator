@@ -1,15 +1,15 @@
-import { handler } from '../handlers/dailySignal';
+import { handler } from '../handlers/dailySignalEMACrossover';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
 (async () => {
-    console.log('🧪 Starting local ETF signal test...');
+    console.log('🧪 Starting local EMA Crossover signal test...');
 
     try {
         await handler();
-        console.log('✅ Local test completed successfully.');
+        console.log('✅ Local EMA crossover test completed successfully.');
     } catch (err) {
-        console.error('❌ Local test failed:', err);
+        console.error('❌ Local EMA crossover test failed:', err);
     }
 })();

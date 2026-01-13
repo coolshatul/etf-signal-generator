@@ -89,3 +89,14 @@ export interface EMA36Result {
     status: 'APPROACHING_BREAKOUT';
     percentDiff: number; // Percentage difference from EMA
 }
+
+// Result for EMA crossover analysis
+export interface EMACrossoverResult {
+    symbol: string;
+    price: number;      // Last traded price
+    ema9: number;       // 9-period EMA value
+    ema15: number;      // 15-period EMA value
+    ema50: number;      // 50-period EMA value
+    crossoverType: 'BULLISH' | 'BEARISH'; // Type of crossover cascade
+    signal: string;     // Description of the crossover signal
+}

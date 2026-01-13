@@ -12,38 +12,52 @@ function withNSE(symbol: string) {
 
 export async function fetchHistoricalData(
   symbol: string,
-  days: number,
-  interval: '1d' | '1wk' = '1d'
+  periods: number,
+  interval: '15m' | '1d' | '1wk' | '1mo' = '1d'
 ): Promise<Candle[]> {
 
   const to = new Date();
   const from = new Date(to);
 
+  // Calculate from date based on interval and periods
   if (interval === '1d') {
-    from.setDate(to.getDate() - days);
-  } else {
-    const weeks = Math.ceil(days / 7);
+    from.setDate(to.getDate() - periods);
+  } else if (interval === '1wk') {
+    const weeks = Math.ceil(periods / 7);
     from.setDate(to.getDate() - weeks * 7);
+  } else if (interval === '1mo') {
+    from.setMonth(to.getMonth() - periods);
+  } else if (interval === '15m') {
+    // For 15m intervals, calculate based on minutes
+    const totalMinutes = periods * 15;
+    from.setMinutes(to.getMinutes() - totalMinutes);
   }
 
-  const queryOptions = {
-    period1: from,   // ✅ Date object
-    period2: to,     // ✅ Date object (important)
-    interval
-  };
-
   try {
-    const results = await yahooFinance.historical(
-      withNSE(symbol),
-      queryOptions
-    );
+    let results;
+
+    // Use chart method for intraday data (15m), historical for daily/weekly
+    if (interval === '15m') {
+      const chartResult = await yahooFinance.chart(withNSE(symbol), {
+        period1: from,
+        period2: to,
+        interval: '15m'
+      });
+      results = chartResult.quotes;
+    } else {
+      results = await yahooFinance.historical(withNSE(symbol), {
+        period1: from,
+        period2: to,
+        interval: interval as '1d' | '1wk' | '1mo'
+      });
+    }
 
     if (!results?.length) {
       throw new Error(`No historical data found for ${symbol}`);
     }
 
-    return results.map(item => ({
-      date: item.date.toISOString().split('T')[0],
+    return results.map((item: any) => ({
+      date: item.date.toISOString(),
       open: item.open ?? 0,
       high: item.high ?? 0,
       low: item.low ?? 0,

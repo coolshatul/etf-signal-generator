@@ -1,7 +1,6 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { BullishStockResult } from '../types';
-import { EMA, RSI, MACD, ATR } from 'technicalindicators';
 import { nifty50Symbols, processWithConcurrency } from '../utils/common';
 
 // Configuration constants

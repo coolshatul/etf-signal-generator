@@ -1,6 +1,6 @@
 import { Telegraf, Markup } from 'telegraf';
 import * as dotenv from 'dotenv';
-import { BullishStockResult, EMA36Result } from '../types/index.js';
+import { BullishStockResult, EMA36Result, EMACrossoverResult } from '../types/index.js';
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
 import { connectToDatabase } from '../db/connection';
 import { Subscriber } from '../db/models';
@@ -295,4 +295,75 @@ ${MESSAGES.DISCLAIMER}
 
     await broadcastMessage(message, keyboard);
     console.log(`📬 Telegram alert sent for ${ema36Results.length} EMA36 signals`);
+}
+
+export async function sendEMACrossoverAlert(emaCrossoverResults: EMACrossoverResult[]): Promise<void> {
+    validateInputs(emaCrossoverResults, 'EMA Crossover');
+
+    if (emaCrossoverResults.length === 0) {
+        const noSignalMessage = `
+📊 *No EMA Crossover Signals Today* 📊
+📅 *Date:* ${getCurrentDate()}
+
+📈 *Nifty50 EMA Crossover Analysis Complete*
+No stocks currently showing EMA cascade crossovers (9-15-50).
+
+${MESSAGES.SEPARATOR}
+${MESSAGES.DISCLAIMER}
+        `.trim();
+
+        await broadcastMessage(noSignalMessage);
+        console.log('📬 Telegram alert sent: No EMA crossover signals');
+        return;
+    }
+
+    const today = getCurrentDate();
+
+    let message = `
+📊 *EMA Crossover Alert* 📊
+📅 *Date:* ${today}
+📈 *Analysis:* Nifty50 Stocks (EMA 9-15-50 Cascade Crossovers)
+${MESSAGES.SEPARATOR}
+🔄 *Found ${emaCrossoverResults.length} EMA Crossover Signal(s)*
+${MESSAGES.SEPARATOR}
+
+`;
+
+    // Show crossover stocks
+    const displayStocks = emaCrossoverResults.slice(0, TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY);
+    displayStocks.forEach((stock, index) => {
+        const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
+        const emoji = stock.crossoverType === 'BULLISH' ? '🚀' : '📉';
+        message += `${index + 1}. ${emoji} **${stock.symbol}** (${stock.crossoverType})
+   💰 LTP: ₹\`${stock.price.toFixed(2)}\`
+   📊 EMAs: 9=\`${stock.ema9.toFixed(2)}\` | 15=\`${stock.ema15.toFixed(2)}\` | 50=\`${stock.ema50.toFixed(2)}\`
+   📝 ${stock.signal}
+   📈 [View Chart](${tvLink})
+
+`;
+    });
+
+    const buttons = displayStocks.map(stock => [
+        Markup.button.callback(`🔍 AI Analysis: ${stock.symbol}`, `analyze_${stock.symbol}`),
+        Markup.button.callback(`📰 News: ${stock.symbol}`, `news_${stock.symbol}`)
+    ]);
+
+    const keyboard = Markup.inlineKeyboard(buttons);
+
+    if (emaCrossoverResults.length > TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY) {
+        message += `... and ${emaCrossoverResults.length - TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY} more stocks\n\n`;
+    }
+
+    message += `${MESSAGES.SEPARATOR}
+🎯 *EMA Crossover Strategy:*
+- EMA9 crosses EMA15, and EMA15 crosses EMA50
+- Cascade crossover indicates strong trend momentum
+- Bullish: All EMAs align upward (9>15>50)
+- Bearish: All EMAs align downward (9<15<50)
+
+${MESSAGES.DISCLAIMER}
+    `.trim();
+
+    await broadcastMessage(message, keyboard);
+    console.log(`📬 Telegram alert sent for ${emaCrossoverResults.length} EMA crossover signals`);
 }

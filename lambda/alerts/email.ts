@@ -1,6 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
-import { BullishStockResult, EMA36Result } from '../types/index.js';
+import { BullishStockResult, EMA36Result, EMACrossoverResult } from '../types/index.js';
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
 
 dotenv.config();
@@ -214,4 +214,80 @@ export async function sendEMA36Email(ema36Results: EMA36Result[]): Promise<void>
 
     await sendEmailWithRetry(subject, html);
     console.log(`📧 Email alert sent for ${ema36Results.length} EMA36 signals`);
+}
+
+export async function sendEMACrossoverEmail(emaCrossoverResults: EMACrossoverResult[]): Promise<void> {
+    if (!Array.isArray(emaCrossoverResults)) {
+        throw new Error('Invalid input: EMA crossover results must be an array');
+    }
+
+    if (emaCrossoverResults.length === 0) {
+        const subject = '📊 No EMA Crossover Signals Today';
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">📊 No EMA Crossover Signals Today</h2>
+                <p><strong>Date:</strong> ${getCurrentDate()}</p>
+                <p><strong>Analysis:</strong> Nifty50 EMA Crossover Analysis Complete</p>
+                <p>No stocks currently showing EMA cascade crossovers (9-15-50).</p>
+                <hr>
+                <p style="color: #666; font-size: 12px;">${MESSAGES.DISCLAIMER}</p>
+            </div>
+        `;
+        await sendEmailWithRetry(subject, html);
+        return;
+    }
+
+    const today = getCurrentDate();
+    const displayStocks = emaCrossoverResults.slice(0, TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY);
+
+    let stocksHtml = '';
+    displayStocks.forEach((stock, index) => {
+        const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
+        const emoji = stock.crossoverType === 'BULLISH' ? '🚀' : '📉';
+        stocksHtml += `
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; background-color: #f9f9f9;">
+                <h3 style="margin: 0 0 10px 0; color: ${stock.crossoverType === 'BULLISH' ? '#2e7d32' : '#d32f2f'};">
+                    ${index + 1}. ${emoji} ${stock.symbol} (${stock.crossoverType})
+                </h3>
+                <p><strong>💰 LTP:</strong> ₹${stock.price.toFixed(2)}</p>
+                <p><strong>📊 EMAs:</strong> 9=₹${stock.ema9.toFixed(2)} | 15=₹${stock.ema15.toFixed(2)} | 50=₹${stock.ema50.toFixed(2)}</p>
+                <p><strong>📝 Signal:</strong> ${stock.signal}</p>
+                <p><a href="${tvLink}" style="background-color: #1976d2; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">📈 View Chart</a></p>
+            </div>
+        `;
+    });
+
+    if (emaCrossoverResults.length > TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY) {
+        stocksHtml += `<p>... and ${emaCrossoverResults.length - TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY} more stocks</p>`;
+    }
+
+    const subject = `📊 EMA Crossover Alert - ${emaCrossoverResults.length} Signals`;
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #1976d2; text-align: center;">📊 EMA Crossover Alert 📊</h1>
+            <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>📅 Date:</strong> ${today}</p>
+                <p style="margin: 5px 0;"><strong>📈 Analysis:</strong> Nifty50 Stocks (EMA 9-15-50 Cascade Crossovers)</p>
+                <p style="margin: 5px 0;"><strong>🔄 Found:</strong> ${emaCrossoverResults.length} EMA Crossover Signal(s)</p>
+            </div>
+
+            ${stocksHtml}
+
+            <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #f57c00;">🎯 EMA Crossover Strategy:</h3>
+                <ul>
+                    <li>EMA9 crosses EMA15, and EMA15 crosses EMA50</li>
+                    <li>Cascade crossover indicates strong trend momentum</li>
+                    <li>Bullish: All EMAs align upward (9>15>50)</li>
+                    <li>Bearish: All EMAs align downward (9<15<50)</li>
+                </ul>
+            </div>
+
+            <hr>
+            <p style="color: #666; font-size: 12px; text-align: center;">${MESSAGES.DISCLAIMER}</p>
+        </div>
+    `;
+
+    await sendEmailWithRetry(subject, html);
+    console.log(`📧 Email alert sent for ${emaCrossoverResults.length} EMA crossover signals`);
 }
