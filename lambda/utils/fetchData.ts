@@ -1,6 +1,6 @@
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from "yahoo-finance2";
+const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey", 'ripHistorical'] });
 import { Candle, InstrumentType } from '../types';
-yahooFinance.suppressNotices(['ripHistorical']);
 
 function withNSE(symbol: string) {
     return symbol.trim().toUpperCase().endsWith('.NS')
@@ -8,43 +8,50 @@ function withNSE(symbol: string) {
         : `${symbol.trim().toUpperCase()}.NS`;
 }
 
-// Fetch historical data for a given symbol and number of past days/weeks
-export async function fetchHistoricalData(symbol: string, days: number, interval: '1d' | '1wk' = '1d'): Promise<Candle[]> {
-    const to = new Date();
-    const from = new Date(to);
+export async function fetchHistoricalData(
+  symbol: string,
+  days: number,
+  interval: '1d' | '1wk' = '1d'
+): Promise<Candle[]> {
 
-    if (interval === '1d') {
-        from.setDate(to.getDate() - days);
-    } else if (interval === '1wk') {
-        // For weekly data, convert days to weeks (roughly)
-        const weeks = Math.ceil(days / 7);
-        from.setDate(to.getDate() - (weeks * 7));
+  const to = new Date();
+  const from = new Date(to);
+
+  if (interval === '1d') {
+    from.setDate(to.getDate() - days);
+  } else {
+    const weeks = Math.ceil(days / 7);
+    from.setDate(to.getDate() - weeks * 7);
+  }
+
+  const queryOptions = {
+    period1: from,   // ✅ Date object
+    period2: to,     // ✅ Date object (important)
+    interval
+  };
+
+  try {
+    const results = await yahooFinance.historical(
+      withNSE(symbol),
+      queryOptions
+    );
+
+    if (!results?.length) {
+      throw new Error(`No historical data found for ${symbol}`);
     }
 
-    const queryOptions = {
-        period1: from.toISOString(),
-        interval: interval as '1d' | '1wk',
-    };
-
-    try {
-        const results = await yahooFinance.historical(withNSE(symbol), queryOptions);
-        if (!results || results.length === 0) {
-            throw new Error(`No historical data found for ${symbol}`);
-        }
-
-        // Map to simplified structure
-        return results.map((item) => ({
-            date: item.date.toISOString().split('T')[0],
-            open: item.open,
-            high: item.high,
-            low: item.low,
-            close: item.close,
-            volume: item.volume,
-        }));
-    } catch (err) {
-        console.error(`❌ Error fetching data for ${symbol}:`, err);
-        return [];
-    }
+    return results.map(item => ({
+      date: item.date.toISOString().split('T')[0],
+      open: item.open ?? 0,
+      high: item.high ?? 0,
+      low: item.low ?? 0,
+      close: item.close ?? 0,
+      volume: item.volume ?? 0
+    }));
+  } catch (err) {
+    console.error(`❌ Error fetching data for ${symbol}:`, err);
+    return [];
+  }
 }
 
 export async function fetchInstrumentType(symbol: string): Promise<InstrumentType> {
