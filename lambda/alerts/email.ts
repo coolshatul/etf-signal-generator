@@ -244,13 +244,19 @@ export async function sendEMACrossoverEmail(emaCrossoverResults: EMACrossoverRes
     displayStocks.forEach((stock, index) => {
         const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
         const emoji = stock.crossoverType === 'BULLISH' ? '🚀' : '📉';
+        const rsiHtml = stock.rsi ? ` | <strong>RSI:</strong> ${stock.rsi.toFixed(1)}` : '';
+        const levelsHtml = stock.stopLoss && stock.target
+            ? `<p><strong>🛡️ SL:</strong> ₹${stock.stopLoss.toFixed(2)} | <strong>🎯 TGT:</strong> ₹${stock.target.toFixed(2)}</p>`
+            : '';
+
         stocksHtml += `
             <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; background-color: #f9f9f9;">
                 <h3 style="margin: 0 0 10px 0; color: ${stock.crossoverType === 'BULLISH' ? '#2e7d32' : '#d32f2f'};">
-                    ${index + 1}. ${emoji} ${stock.symbol} (${stock.crossoverType})
+                    ${index + 1}. ${emoji} ${stock.symbol} (${stock.crossoverType})${rsiHtml}
                 </h3>
                 <p><strong>💰 LTP:</strong> ₹${stock.price.toFixed(2)}</p>
                 <p><strong>📊 EMAs:</strong> 9=₹${stock.ema9.toFixed(2)} | 15=₹${stock.ema15.toFixed(2)} | 50=₹${stock.ema50.toFixed(2)}</p>
+                ${levelsHtml}
                 <p><strong>📝 Signal:</strong> ${stock.signal}</p>
                 <p><a href="${tvLink}" style="background-color: #1976d2; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">📈 View Chart</a></p>
             </div>

@@ -13,7 +13,7 @@ function withNSE(symbol: string) {
 export async function fetchHistoricalData(
   symbol: string,
   periods: number,
-  interval: '15m' | '1d' | '1wk' | '1mo' = '1d'
+  interval: '15m' | '1h' | '1d' | '1wk' | '1mo' = '1d'
 ): Promise<Candle[]> {
 
   const to = new Date();
@@ -27,6 +27,9 @@ export async function fetchHistoricalData(
     from.setDate(to.getDate() - weeks * 7);
   } else if (interval === '1mo') {
     from.setMonth(to.getMonth() - periods);
+  } else if (interval === '1h') {
+    const hours = periods;
+    from.setHours(to.getHours() - hours);
   } else if (interval === '15m') {
     // For 15m intervals, calculate based on minutes
     const totalMinutes = periods * 15;
@@ -36,21 +39,12 @@ export async function fetchHistoricalData(
   try {
     let results;
 
-    // Use chart method for intraday data (15m), historical for daily/weekly
-    if (interval === '15m') {
-      const chartResult = await yahooFinance.chart(withNSE(symbol), {
+    const chartResult = await yahooFinance.chart(withNSE(symbol), {
         period1: from,
         period2: to,
-        interval: '15m'
+        interval: interval
       });
       results = chartResult.quotes;
-    } else {
-      results = await yahooFinance.historical(withNSE(symbol), {
-        period1: from,
-        period2: to,
-        interval: interval as '1d' | '1wk' | '1mo'
-      });
-    }
 
     if (!results?.length) {
       throw new Error(`No historical data found for ${symbol}`);

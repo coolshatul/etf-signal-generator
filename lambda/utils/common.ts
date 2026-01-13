@@ -10,6 +10,14 @@ export const nifty50Symbols = [
     'TATASTEEL', 'TECHM', 'TITAN', 'TRENT', 'ULTRACEMCO', 'WIPRO'
 ];
 
+export const niftyNext50Symbols = [
+    'VBL', 'BAJAJHLDNG', 'HINDZINC', 'VEDL', 'ADANIGREEN', 'LTIM', 'INDHOTEL', 'HAL', 'ENRIN', 'ADANIENSOL',
+    'JINDALSTEL', 'BANKBARODA', 'CHOLAFIN', 'HAVELLS', 'HYUNDAI', 'TVSMOTOR', 'UNITDSPR', 'ZYDUSLIFE', 'BRITANNIA', 'MOTHERSON',
+    'JSWENERGY', 'AMBUJACEM', 'GODREJCP', 'MAZDOCK', 'PIDILITIND', 'DLF', 'CANBK', 'PNB', 'ADANIPOWER', 'BAJAJHFL',
+    'SOLARINDS', 'DMART', 'SIEMENS', 'DIVISLAB', 'RECLTD', 'TORNTPHARM', 'LODHA', 'ICICIGI', 'IRFC', 'TATAPOWER',
+    'PFC', 'NAUKRI', 'BOSCHLTD', 'LICI', 'CGPOWER', 'IOC', 'ABB', 'SHREECEM', 'BPCL', 'GAIL'
+];
+
 // Configuration constants
 export const API_CONFIG = {
     DELAY_MS: 100,  // Delay between API calls to avoid rate limits

@@ -12,8 +12,23 @@ export interface Candle {
 // After indicators are applied
 export interface CandleWithIndicators extends Candle {
     rsi: number | null;
-    emaFast: number | null;
-    emaSlow: number | null;
+    ema9: number | null;
+    ema10: number | null;
+    ema15: number | null;
+    ema20: number | null;
+    ema21: number | null;
+    ema36: number | null;
+    ema50: number | null;
+    macd: number | null;
+    macdSignal: number | null;
+    macdHistogram: number | null;
+    atr: number | null;
+    adx: number | null;
+    bbUpper: number | null;
+    bbLower: number | null;
+    bbMiddle: number | null;
+    volEma20: number | null;
+    avgVolume20: number | null;
 }
 
 // Strategy configuration
@@ -99,4 +114,7 @@ export interface EMACrossoverResult {
     ema50: number;      // 50-period EMA value
     crossoverType: 'BULLISH' | 'BEARISH'; // Type of crossover cascade
     signal: string;     // Description of the crossover signal
+    rsi?: number;       // RSI value at crossover
+    stopLoss?: number;  // Recommended stop loss
+    target?: number;    // Recommended target
 }

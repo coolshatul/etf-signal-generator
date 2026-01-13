@@ -114,11 +114,14 @@ export async function logEMACrossoverSignals(results: EMACrossoverResult[]): Pro
             signals: [r.signal],
             strategy: 'EMA_CROSSOVER_SCAN',
             status: 'OPEN',
+            stopLoss: r.stopLoss,
+            target: r.target,
             metadata: {
                 ema9: r.ema9,
                 ema15: r.ema15,
                 ema50: r.ema50,
-                crossoverType: r.crossoverType
+                crossoverType: r.crossoverType,
+                rsi: r.rsi
             }
         }));
 

@@ -334,9 +334,14 @@ ${MESSAGES.SEPARATOR}
     displayStocks.forEach((stock, index) => {
         const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
         const emoji = stock.crossoverType === 'BULLISH' ? '🚀' : '📉';
-        message += `${index + 1}. ${emoji} **${stock.symbol}** (${stock.crossoverType})
+        const rsiText = stock.rsi ? ` | RSI: \`${stock.rsi.toFixed(1)}\`` : '';
+        const levelsText = stock.stopLoss && stock.target
+            ? `\n   🛡️ SL: ₹\`${stock.stopLoss.toFixed(2)}\` | 🎯 TGT: ₹\`${stock.target.toFixed(2)}\``
+            : '';
+
+        message += `${index + 1}. ${emoji} **${stock.symbol}** (${stock.crossoverType})${rsiText}
    💰 LTP: ₹\`${stock.price.toFixed(2)}\`
-   📊 EMAs: 9=\`${stock.ema9.toFixed(2)}\` | 15=\`${stock.ema15.toFixed(2)}\` | 50=\`${stock.ema50.toFixed(2)}\`
+   📊 EMAs: 9=\`${stock.ema9.toFixed(2)}\` | 15=\`${stock.ema15.toFixed(2)}\` | 50=\`${stock.ema50.toFixed(2)}\`${levelsText}
    📝 ${stock.signal}
    📈 [View Chart](${tvLink})
 
