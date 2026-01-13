@@ -10,6 +10,7 @@ Here are the available commands you can use:
 📢 *Signal Subscriptions:*
 🔔 /subscribe - Subscribe to receive daily trading signals
 🔕 /unsubscribe - Unsubscribe from trading signals
+📈 /performance - View success rate and P&L of past signals
 👥 /subscribers - View subscriber statistics (admin only)
 
 🤖 /technicals SYMBOL

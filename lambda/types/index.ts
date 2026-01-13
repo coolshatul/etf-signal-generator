@@ -78,6 +78,7 @@ export interface BullishStockResult {
     swingLow: number;
     swingHigh: number;
     baseStopLevel: number;
+    marketRegimeBullish?: boolean;
 }
 
 // Result for EMA36 analysis

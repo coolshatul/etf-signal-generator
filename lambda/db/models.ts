@@ -47,6 +47,9 @@ export interface ISignal extends Document {
     date: Date;
     signal: 'BUY' | 'SELL' | 'HOLD';
     price: number;
+    lastPrice?: number;
+    performancePercent?: number;
+    status: 'OPEN' | 'HIT_TARGET' | 'HIT_SL' | 'CLOSED';
     rating: number;
     signals: string[];
     stopLoss: number;
@@ -76,6 +79,18 @@ const SignalSchema: Schema = new Schema({
     price: {
         type: Number,
         required: true
+    },
+    lastPrice: {
+        type: Number
+    },
+    performancePercent: {
+        type: Number
+    },
+    status: {
+        type: String,
+        enum: ['OPEN', 'HIT_TARGET', 'HIT_SL', 'CLOSED'],
+        default: 'OPEN',
+        index: true
     },
     rating: {
         type: Number,

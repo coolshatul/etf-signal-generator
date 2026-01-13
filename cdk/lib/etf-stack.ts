@@ -32,11 +32,13 @@ export class EtfStack extends Stack {
             },
         });
 
-        // ⏰ Schedule the Lambda to run at 9:00 AM IST (UTC+5:30 = 3:30 AM UTC)
-        new events.Rule(this, 'DailySignalSchedule', {
+        // ⏰ Schedule the Lambda to run hourly from 9:00 AM to 4:00 PM IST
+        // 9:00 AM IST = 3:30 AM UTC
+        // 4:00 PM IST = 10:30 AM UTC
+        new events.Rule(this, 'HourlySignalSchedule', {
             schedule: events.Schedule.cron({
                 minute: '30',
-                hour: '3',
+                hour: '3-10',
                 weekDay: 'MON-FRI', // Weekdays only
             }),
             targets: [new targets.LambdaFunction(dailySignalLambda)],
@@ -60,7 +62,7 @@ export class EtfStack extends Stack {
             },
         });
 
-        // ⏰ Schedule the EMA36 Lambda to run at 9:15 AM IST (UTC+5:30 = 3:45 AM UTC)
+        // ⏰ Schedule the EMA36 Lambda to run once a day at 9:15 AM IST (3:45 AM UTC)
         new events.Rule(this, 'EMA36SignalSchedule', {
             schedule: events.Schedule.cron({
                 minute: '45',
@@ -68,6 +70,27 @@ export class EtfStack extends Stack {
                 weekDay: 'MON-FRI', // Weekdays only
             }),
             targets: [new targets.LambdaFunction(ema36SignalLambda)],
+        });
+
+        // 🟢 Performance update Lambda function
+        const performanceUpdateLambda = new NodejsFunction(this, 'PerformanceUpdateLambda', {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            entry: path.join(__dirname, '../../lambda/handlers/updatePerformance.ts'),
+            handler: 'handler',
+            timeout: Duration.seconds(60),
+            environment: {
+                MONGODB_URI: process.env.MONGODB_URI ?? '',
+            },
+        });
+
+        // ⏰ Schedule performance update at 4:30 PM IST (11:00 AM UTC)
+        new events.Rule(this, 'PerformanceUpdateSchedule', {
+            schedule: events.Schedule.cron({
+                minute: '0',
+                hour: '11',
+                weekDay: 'MON-FRI',
+            }),
+            targets: [new targets.LambdaFunction(performanceUpdateLambda)],
         });
 
         // 🤖 Telegram Webhook Lambda

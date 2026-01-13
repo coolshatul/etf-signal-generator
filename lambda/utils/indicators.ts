@@ -1,4 +1,4 @@
-import { RSI, EMA, MACD, ATR, ADX, BollingerBands } from 'technicalindicators';
+import { RSI, EMA, MACD, ATR, ADX, BollingerBands, OBV } from 'technicalindicators';
 import { Candle } from '../types';
 
 export function calculateIndicators(
@@ -19,6 +19,9 @@ export function calculateIndicators(
     const ema21 = EMA.calculate({ period: 21, values: closes });
     const ema36 = EMA.calculate({ period: 36, values: closes });
     const ema50 = EMA.calculate({ period: 50, values: closes });
+
+    const obv = OBV.calculate({ close: closes, volume: volumes });
+    const volEma20 = EMA.calculate({ period: 20, values: volumes });
 
     const macd = MACD.calculate({
         fastPeriod: 12,
@@ -47,6 +50,8 @@ export function calculateIndicators(
         const offsetEma21 = data.length - ema21.length;
         const offsetEma36 = data.length - ema36.length;
         const offsetEma50 = data.length - ema50.length;
+        const offsetObv = data.length - obv.length;
+        const offsetVolEma = data.length - volEma20.length;
         const offsetMacd = data.length - macd.length;
         const offsetAtr = data.length - atr.length;
         const offsetAdx = data.length - adx.length;
@@ -61,6 +66,8 @@ export function calculateIndicators(
             ema21: i >= offsetEma21 ? ema21[i - offsetEma21] : null,
             ema36: i >= offsetEma36 ? ema36[i - offsetEma36] : null,
             ema50: i >= offsetEma50 ? ema50[i - offsetEma50] : null,
+            obv: i >= offsetObv ? obv[i - offsetObv] : null,
+            volEma20: i >= offsetVolEma ? volEma20[i - offsetVolEma] : null,
             macd: i >= offsetMacd ? macd[i - offsetMacd]?.MACD : null,
             macdSignal: i >= offsetMacd ? macd[i - offsetMacd]?.signal : null,
             macdHistogram: i >= offsetMacd ? macd[i - offsetMacd]?.histogram : null,

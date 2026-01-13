@@ -1,4 +1,4 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import * as dotenv from 'dotenv';
 import { BullishStockResult, EMA36Result } from '../types/index.js';
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
@@ -170,13 +170,18 @@ ${MESSAGES.DISCLAIMER}
 
     const today = getCurrentDate();
 
+    const isMarketBearish = bullishResults.some(r => r.marketRegimeBullish === false);
+    const marketStatus = isMarketBearish
+        ? '⚠️ *BEARISH MARKET REGIME* ⚠️\n(Only high-conviction signals allowed)\n'
+        : '✅ *BULLISH MARKET REGIME*';
+
     let message = `
 🚀 *Bullish Stocks Alert* 🚀
 📅 *Date:* ${today}
+🌍 *Market:* ${marketStatus}
 📊 *Analysis:* Nifty50 Stocks
 ${MESSAGES.SEPARATOR}
 📈 *Found ${bullishResults.length} Bullish Stock(s)*
-*Based on: Daily Close > 2 days ago Close*
 ${MESSAGES.SEPARATOR}
 
 `;
@@ -188,7 +193,7 @@ ${MESSAGES.SEPARATOR}
 
     topStocks.forEach((stock, index) => {
         const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
-        message += `${index + 1}. **${stock.symbol}** (Rating: ${stock.rating}/8)
+        const stockMessage = `${index + 1}. **${stock.symbol}** (Rating: ${stock.rating}/8)
    📍 Signals: ${stock.signals.join(', ')}
    🛡️ Stop Loss: ₹\`${stock.stopLoss.toFixed(2)}\` (\`${stock.stopLossPercent.toFixed(1)}%\`)
    🎯 Target: ₹\`${stock.target.toFixed(2)}\` (+\`${stock.targetPercent.toFixed(1)}%\`)
@@ -196,11 +201,15 @@ ${MESSAGES.SEPARATOR}
    📈 [View Chart](${tvLink})
 
 `;
+        message += stockMessage;
     });
 
-    if (bullishResults.length > TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY) {
-        message += `\n... and ${bullishResults.length - TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY} more bullish stocks\n`;
-    }
+    const buttons = topStocks.map(stock => [
+        Markup.button.callback(`🔍 AI Analysis: ${stock.symbol}`, `analyze_${stock.symbol}`),
+        Markup.button.callback(`📰 News: ${stock.symbol}`, `news_${stock.symbol}`)
+    ]);
+
+    const keyboard = Markup.inlineKeyboard(buttons);
 
     message += `
 ${MESSAGES.SEPARATOR}
@@ -214,7 +223,7 @@ ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
     `.trim();
 
-    await broadcastMessage(message);
+    await broadcastMessage(message, keyboard);
     console.log(`📬 Telegram alert sent for ${bullishResults.length} bullish stocks`);
 }
 
@@ -262,6 +271,13 @@ ${MESSAGES.SEPARATOR}
 `;
     });
 
+    const buttons = displayStocks.map(stock => [
+        Markup.button.callback(`🔍 AI Analysis: ${stock.symbol}`, `analyze_${stock.symbol}`),
+        Markup.button.callback(`📰 News: ${stock.symbol}`, `news_${stock.symbol}`)
+    ]);
+
+    const keyboard = Markup.inlineKeyboard(buttons);
+
     if (ema36Results.length > TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY) {
         message += `... and ${ema36Results.length - TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY} more stocks\n\n`;
     }
@@ -275,6 +291,6 @@ ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
     `.trim();
 
-    await broadcastMessage(message);
+    await broadcastMessage(message, keyboard);
     console.log(`📬 Telegram alert sent for ${ema36Results.length} EMA36 signals`);
 }

@@ -26,6 +26,7 @@ export async function logBullishSignals(results: BullishStockResult[]): Promise<
             target: r.target,
             riskRewardRatio: r.riskRewardRatio,
             strategy: 'BULLISH_SCAN',
+            status: 'OPEN',
             metadata: {
                 swingLow: r.swingLow,
                 swingHigh: r.swingHigh,
@@ -70,6 +71,7 @@ export async function logEMA36Signals(results: EMA36Result[]): Promise<void> {
             rating: 0,
             signals: [`EMA36 Status: ${r.status}`],
             strategy: 'EMA36_SCAN',
+            status: 'OPEN',
             metadata: {
                 ema36: r.ema36,
                 percentDiff: r.percentDiff
@@ -87,5 +89,47 @@ export async function logEMA36Signals(results: EMA36Result[]): Promise<void> {
         console.log(`✅ Logged ${results.length} EMA36 signals to MongoDB.`);
     } catch (err) {
         console.error('❌ Error logging EMA36 signals to MongoDB:', err);
+    }
+}
+import { fetchHistoricalData } from '../utils/fetchData';
+
+/**
+ * Updates the performance of all open signals by fetching latest prices.
+ */
+export async function updateSignalPerformance(): Promise<void> {
+    try {
+        await connectToDatabase();
+
+        // Find all open signals
+        const openSignals = await Signal.find({ status: 'OPEN' });
+        if (!openSignals.length) {
+            console.log('ℹ️ No open signals to update.');
+            return;
+        }
+
+        console.log(`🔄 Updating performance for ${openSignals.length} open signals...`);
+
+        for (const signal of openSignals) {
+            // Fetch latest 2 days of data to get LTP
+            const data = await fetchHistoricalData(signal.symbol, 5);
+            if (!data.length) continue;
+
+            const ltp = data[data.length - 1].close;
+            const perf = ((ltp - signal.price) / signal.price) * 100;
+
+            let status = 'OPEN';
+            if (signal.target && ltp >= signal.target) status = 'HIT_TARGET';
+            else if (signal.stopLoss && ltp <= signal.stopLoss) status = 'HIT_SL';
+
+            await Signal.findByIdAndUpdate(signal._id, {
+                lastPrice: ltp,
+                performancePercent: perf,
+                status
+            });
+        }
+
+        console.log('✅ Updated all open signals performance.');
+    } catch (err) {
+        console.error('❌ Error updating signal performance:', err);
     }
 }

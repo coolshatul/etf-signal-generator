@@ -55,7 +55,11 @@ function calculateLevels(lastClose: number, swingLow: number, swingHigh: number,
 
 // Function to evaluate bullish conditions
 function evaluateBullish(indicators: any, swingLow: number, swingHigh: number) {
-    const { ema10, ema20, ema50, prevEMA20, prevEMA50, rsi, macdHistogram, lastClose, prevClose, prevPrevClose } = indicators;
+    const {
+        ema10, ema20, ema50, prevEMA20, prevEMA50,
+        rsi, macdHistogram, lastClose, prevClose, prevPrevClose,
+        volume, avgVolume20, obv, prevObv
+    } = indicators;
 
     // Trend Analysis
     const isUptrend = lastClose > prevClose;
@@ -78,7 +82,11 @@ function evaluateBullish(indicators: any, swingLow: number, swingHigh: number) {
     const rsiInRange = rsi >= CONFIG.RSI_MIN && rsi <= CONFIG.RSI_MAX;
     const macdPositive = macdHistogram > 0;
 
-    // Simplified bullish rating (up to 8 points)
+    // Volume Analysis
+    const isHighVolume = volume > avgVolume20;
+    const isObvRising = obv > prevObv;
+
+    // Simplified bullish rating (up to 10 points)
     let rating = 0;
     const signals = [];
 
@@ -107,6 +115,16 @@ function evaluateBullish(indicators: any, swingLow: number, swingHigh: number) {
         signals.push('RSI in range and MACD positive');
     }
 
+    if (isHighVolume) {
+        rating += 1;
+        signals.push('High volume confirmation');
+    }
+
+    if (isObvRising) {
+        rating += 1;
+        signals.push('OBV trending up');
+    }
+
     const isBullish = rating >= CONFIG.BULLISH_THRESHOLD;
 
     return { isBullish, rating, signals };
@@ -128,8 +146,8 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         const prevPrevCandle = dataWithIndicators.length >= 3 ? dataWithIndicators[dataWithIndicators.length - 3] : null;
 
         // Extract necessary indicator values
-        const { close: lastClose, ema10, ema20, ema50, rsi, macdHistogram, atr } = lastCandle;
-        const { close: prevClose, ema20: prevEMA20, ema50: prevEMA50 } = prevCandle;
+        const { close: lastClose, ema10, ema20, ema50, rsi, macdHistogram, atr, volume, avgVolume20, obv } = lastCandle;
+        const { close: prevClose, ema20: prevEMA20, ema50: prevEMA50, obv: prevObv } = prevCandle;
 
         // Early validation
         if (lastClose <= 0 || prevClose <= 0) {
@@ -148,7 +166,8 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         // Evaluate bullish conditions
         const indicators = {
             ema10, ema20, ema50, prevEMA20, prevEMA50, rsi, macdHistogram, lastClose, prevClose,
-            prevPrevClose: prevPrevCandle ? prevPrevCandle.close : null
+            prevPrevClose: prevPrevCandle ? prevPrevCandle.close : null,
+            volume, avgVolume20, obv, prevObv
         };
         const bullishResult = evaluateBullish(indicators, swingLow, swingHigh);
 
@@ -166,6 +185,8 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
     }
 }
 
+import { getMarketRegime } from './marketRegime';
+
 /**
  * Analyzes Nifty50 stocks for bullish signals based on EMA strategy.
  * @returns {Promise<BullishStockResult[]>} Array of bullish stock results
@@ -173,11 +194,33 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
 export async function analyzeNifty50Bullish(): Promise<BullishStockResult[]> {
     console.log('📊 Analyzing Nifty50 stocks for bullish signals...');
 
+    // Get overall market regime first
+    const marketRegime = await getMarketRegime();
+    console.log(`🌍 Market Regime: ${marketRegime.isBullish ? 'BULLISH' : 'BEARISH'} (${marketRegime.trend})`);
+
     // Analyze each stock with concurrency control to avoid rate limits
     const results = await processWithConcurrency(nifty50Symbols, analyzeBullishStock);
 
     // Filter to bullish stocks only
-    const bullishResults = results.filter(r => r.isBullish);
+    let bullishResults = results.filter(r => r.isBullish);
+
+    // Filter based on market regime
+    if (!marketRegime.isBullish) {
+        console.log('⚠️ Market is BEARISH. Suppressing low-conviction signals.');
+        // If market is bearish, only allow ultra-high conviction signals (rating >= 8)
+        bullishResults = bullishResults.filter(r => r.rating >= 8);
+
+        // Add market status to remaining results
+        bullishResults = bullishResults.map(r => ({
+            ...r,
+            marketRegimeBullish: false
+        }));
+    } else {
+        bullishResults = bullishResults.map(r => ({
+            ...r,
+            marketRegimeBullish: true
+        }));
+    }
 
     console.log(`✅ Found ${bullishResults.length} bullish stocks out of ${nifty50Symbols.length}`);
 

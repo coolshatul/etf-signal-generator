@@ -8,12 +8,37 @@ import { handleNews } from '../telegram/commands/handleNews';
 import { handleSubscribe } from '../telegram/commands/handleSubscribe';
 import { handleUnsubscribe } from '../telegram/commands/handleUnsubscribe';
 import { handleSubscribers } from '../telegram/commands/handleSubscribers';
+import { handlePerformance } from '../telegram/commands/handlePerformance';
 
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN!);
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     const body = JSON.parse(event.body || '{}');
+
+    // Handle Callback Queries (from inline buttons)
+    if (body.callback_query) {
+        const callbackQuery = body.callback_query;
+        const chatId = callbackQuery.message.chat.id;
+        const data = callbackQuery.data; // e.g., "analyze_RELIANCE"
+
+        try {
+            if (data.startsWith('analyze_')) {
+                const symbol = data.replace('analyze_', '');
+                await bot.telegram.answerCbQuery(callbackQuery.id, `🔄 Analyzing ${symbol}...`);
+                await handleTechnicals(bot, chatId, symbol);
+            } else if (data.startsWith('news_')) {
+                const symbol = data.replace('news_', '');
+                await bot.telegram.answerCbQuery(callbackQuery.id, `📰 Fetching news for ${symbol}...`);
+                await handleNews(bot, chatId, symbol, 5);
+            }
+        } catch (err) {
+            console.error('❌ Error handling callback query:', err);
+            await bot.telegram.answerCbQuery(callbackQuery.id, '❌ Error processing request');
+        }
+        return { statusCode: 200, body: 'OK' };
+    }
+
     const message = body.message;
     if (!message || !message.text) return { statusCode: 200, body: 'Ignored' };
 
@@ -37,6 +62,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             break;
         case '/subscribers':
             await handleSubscribers(bot, chatId);
+            break;
+        case '/performance':
+            await handlePerformance(bot, chatId);
             break;
 
         case '/technicals':
