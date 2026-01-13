@@ -148,31 +148,76 @@ async function broadcastMessage(message: string, options: any = {}): Promise<voi
     console.log(`📬 Broadcast complete: ${successCount} successful, ${failureCount} failed`);
 }
 
+import { Signal } from '../db/models';
+
 export async function sendBullishStocksAlert(bullishResults: BullishStockResult[]): Promise<void> {
     validateInputs(bullishResults, 'bullish');
+    await connectToDatabase();
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // 1. Handle "No Signals" deduplication
     if (bullishResults.length === 0) {
+        const alreadySentNoSignal = await Signal.findOne({
+            symbol: 'SYSTEM_STATUS',
+            date: todayStart,
+            strategy: 'BULLISH_SCAN_ALERT'
+        });
+
+        if (alreadySentNoSignal) {
+            console.log('🤫 Staying silent: "No Bullish Signals" alert already sent today.');
+            return;
+        }
+
         const noSignalMessage = `
 🔔 *No Bullish Signals Today* 🔔
 📅 *Date:* ${getCurrentDate()}
 
 📊 *Nifty50 Analysis Complete*
-No stocks currently meet the bullish criteria (rating ≥ 5/8).
+No stocks currently meet the bullish criteria (rating ≥ 5/10).
 
 ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
         `.trim();
 
         await broadcastMessage(noSignalMessage);
+
+        // Log that we sent the "No Signal" alert
+        await new Signal({
+            symbol: 'SYSTEM_STATUS',
+            date: todayStart,
+            strategy: 'BULLISH_SCAN_ALERT',
+            signal: 'HOLD',
+            price: 0,
+            rating: 0
+        }).save();
+
         console.log('📬 Telegram alert sent: No bullish signals');
         return;
     }
 
-    const today = getCurrentDate();
+    // 2. Handle Stock Signal deduplication
+    // Fetch signals already alerted today
+    const alertedToday = await Signal.find({
+        date: todayStart,
+        strategy: 'BULLISH_SCAN_ALERT',
+        symbol: { $ne: 'SYSTEM_STATUS' }
+    });
+    const alertedSymbols = new Set(alertedToday.map(s => s.symbol));
 
+    // Filter to only NEW signals we haven't alerted yet
+    const newSignals = bullishResults.filter(r => !alertedSymbols.has(r.symbol));
+
+    if (newSignals.length === 0) {
+        console.log('ℹ️ All found bullish stocks have already been alerted today. Skipping duplicate alert.');
+        return;
+    }
+
+    const today = getCurrentDate();
     const isMarketBearish = bullishResults.some(r => r.marketRegimeBullish === false);
     const marketStatus = isMarketBearish
-        ? '⚠️ *BEARISH MARKET REGIME* ⚠️\n(Only high-conviction signals allowed)\n'
+        ? '⚠️ *BEARISH MARKET REGIME* ⚠️\n(Volatility is high, trade cautiously)\n'
         : '✅ *BULLISH MARKET REGIME*';
 
     let message = `
@@ -181,19 +226,19 @@ ${MESSAGES.DISCLAIMER}
 🌍 *Market:* ${marketStatus}
 📊 *Analysis:* Nifty50 Stocks
 ${MESSAGES.SEPARATOR}
-📈 *Found ${bullishResults.length} Bullish Stock(s)*
+📈 *Found ${newSignals.length} New Bullish Opportunity(s)*
 ${MESSAGES.SEPARATOR}
 
 `;
 
     // Sort by rating (highest first) and limit to top stocks for message length
-    const topStocks = bullishResults
+    const topStocks = newSignals
         .sort((a, b) => b.rating - a.rating)
         .slice(0, TELEGRAM_CONFIG.MAX_STOCKS_DISPLAY);
 
     topStocks.forEach((stock, index) => {
         const tvLink = `https://in.tradingview.com/chart/?symbol=NSE%3A${stock.symbol}`;
-        const stockMessage = `${index + 1}. **${stock.symbol}** (Rating: ${stock.rating}/8)
+        const stockMessage = `${index + 1}. **${stock.symbol}** (Rating: ${stock.rating}/10)
    📍 Signals: ${stock.signals.join(', ')}
    🛡️ Stop Loss: ₹\`${stock.stopLoss.toFixed(2)}\` (\`${stock.stopLossPercent.toFixed(1)}%\`)
    🎯 Target: ₹\`${stock.target.toFixed(2)}\` (+\`${stock.targetPercent.toFixed(1)}%\`)
@@ -218,13 +263,27 @@ ${MESSAGES.SEPARATOR}
 - Price above EMA20/50
 - EMA20 > EMA50 structure
 - RSI 40-60 + MACD positive
-- Rating ≥ 5/8 points
+- Volume > 20d Average + Rising OBV
+- Rating ≥ 5/10 points
 
 ${MESSAGES.DISCLAIMER}
     `.trim();
 
     await broadcastMessage(message, keyboard);
-    console.log(`📬 Telegram alert sent for ${bullishResults.length} bullish stocks`);
+
+    // 3. Log signals as "Alerted" to DB
+    for (const stock of topStocks) {
+        await new Signal({
+            symbol: stock.symbol,
+            date: todayStart,
+            strategy: 'BULLISH_SCAN_ALERT',
+            signal: 'BUY',
+            price: stock.price,
+            rating: stock.rating
+        }).save();
+    }
+
+    console.log(`📬 Telegram alert sent for ${newSignals.length} new bullish stocks`);
 }
 
 export async function sendEMA36Alert(ema36Results: EMA36Result[]): Promise<void> {

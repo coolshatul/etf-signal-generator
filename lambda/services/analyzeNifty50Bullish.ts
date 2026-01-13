@@ -204,23 +204,11 @@ export async function analyzeNifty50Bullish(): Promise<BullishStockResult[]> {
     // Filter to bullish stocks only
     let bullishResults = results.filter(r => r.isBullish);
 
-    // Filter based on market regime
-    if (!marketRegime.isBullish) {
-        console.log('⚠️ Market is BEARISH. Suppressing low-conviction signals.');
-        // If market is bearish, only allow ultra-high conviction signals (rating >= 8)
-        bullishResults = bullishResults.filter(r => r.rating >= 8);
-
-        // Add market status to remaining results
-        bullishResults = bullishResults.map(r => ({
-            ...r,
-            marketRegimeBullish: false
-        }));
-    } else {
-        bullishResults = bullishResults.map(r => ({
-            ...r,
-            marketRegimeBullish: true
-        }));
-    }
+    // Filter based on market regime (Don't suppress, just flag)
+    bullishResults = bullishResults.map(r => ({
+        ...r,
+        marketRegimeBullish: marketRegime.isBullish
+    }));
 
     console.log(`✅ Found ${bullishResults.length} bullish stocks out of ${nifty50Symbols.length}`);
 
