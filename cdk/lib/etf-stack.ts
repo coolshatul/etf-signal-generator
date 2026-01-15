@@ -14,12 +14,37 @@ export class EtfStack extends Stack {
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
 
+        // 📦 Shared dependencies layer
+        const sharedDepsLayer = new lambda.LayerVersion(this, 'SharedDepsLayer', {
+            code: lambda.Code.fromAsset(path.join(__dirname, '../layers/shared-deps')),
+            compatibleRuntimes: [lambda.Runtime.NODEJS_20_X],
+            description: 'Shared dependencies for Lambda functions',
+        });
+
         // 🟡 Daily signal Lambda function
         const dailySignalLambda = new NodejsFunction(this, 'DailySignalLambda', {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignal.ts'),
             handler: 'handler',
             timeout: Duration.seconds(60),
+            layers: [sharedDepsLayer],
+            bundling: {
+                minify: true,
+                sourceMap: false,
+                target: 'node20',
+                externalModules: [
+                    'axios',
+                    'chalk',
+                    'groq-sdk',
+                    'mongoose',
+                    'nodemailer',
+                    'rss-parser',
+                    'technicalindicators',
+                    'telegraf',
+                    'vader-sentiment',
+                    'yahoo-finance2'
+                ],
+            },
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
@@ -51,6 +76,24 @@ export class EtfStack extends Stack {
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMA36.ts'),
             handler: 'handler',
             timeout: Duration.seconds(60),
+            layers: [sharedDepsLayer],
+            bundling: {
+                minify: true,
+                sourceMap: false,
+                target: 'node20',
+                externalModules: [
+                    'axios',
+                    'chalk',
+                    'groq-sdk',
+                    'mongoose',
+                    'nodemailer',
+                    'rss-parser',
+                    'technicalindicators',
+                    'telegraf',
+                    'vader-sentiment',
+                    'yahoo-finance2'
+                ],
+            },
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
@@ -79,6 +122,24 @@ export class EtfStack extends Stack {
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMACrossover.ts'),
             handler: 'handler',
             timeout: Duration.seconds(60),
+            layers: [sharedDepsLayer],
+            bundling: {
+                minify: true,
+                sourceMap: false,
+                target: 'node20',
+                externalModules: [
+                    'axios',
+                    'chalk',
+                    'groq-sdk',
+                    'mongoose',
+                    'nodemailer',
+                    'rss-parser',
+                    'technicalindicators',
+                    'telegraf',
+                    'vader-sentiment',
+                    'yahoo-finance2'
+                ],
+            },
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
@@ -108,6 +169,24 @@ export class EtfStack extends Stack {
             entry: path.join(__dirname, '../../lambda/handlers/updatePerformance.ts'),
             handler: 'handler',
             timeout: Duration.seconds(60),
+            layers: [sharedDepsLayer],
+            bundling: {
+                minify: true,
+                sourceMap: false,
+                target: 'node20',
+                externalModules: [
+                    'axios',
+                    'chalk',
+                    'groq-sdk',
+                    'mongoose',
+                    'nodemailer',
+                    'rss-parser',
+                    'technicalindicators',
+                    'telegraf',
+                    'vader-sentiment',
+                    'yahoo-finance2'
+                ],
+            },
             environment: {
                 MONGODB_URI: process.env.MONGODB_URI ?? '',
             },
@@ -129,6 +208,24 @@ export class EtfStack extends Stack {
             entry: path.join(__dirname, '../../lambda/handlers/telegramWebhook.ts'),
             handler: 'handler',
             timeout: Duration.seconds(30),
+            layers: [sharedDepsLayer],
+            bundling: {
+                minify: true,
+                sourceMap: false,
+                target: 'node20',
+                externalModules: [
+                    'axios',
+                    'chalk',
+                    'groq-sdk',
+                    'mongoose',
+                    'nodemailer',
+                    'rss-parser',
+                    'technicalindicators',
+                    'telegraf',
+                    'vader-sentiment',
+                    'yahoo-finance2'
+                ],
+            },
             environment: {
                 TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
