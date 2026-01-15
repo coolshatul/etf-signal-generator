@@ -234,6 +234,8 @@ export class EtfStack extends Stack {
                 TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
                 MONGODB_URI: process.env.MONGODB_URI ?? '',
                 GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
+                FUNDAMENTAL_API_KEY: process.env.FUNDAMENTAL_API_KEY ?? '',
+                FUNDAMENTAL_API_BASE_URL: process.env.FUNDAMENTAL_API_BASE_URL ?? '',
             },
         });
 

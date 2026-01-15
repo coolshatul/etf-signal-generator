@@ -74,6 +74,30 @@ export interface FundamentalData {
     beta?: number;
     revenueGrowth?: number;
     earningsGrowth?: number;
+    // Enhanced data from new API
+    companyName?: string;
+    sector?: string;
+    description?: string;
+    quarterlyData?: any[];
+    quarterlyInsights?: any;
+    annualData?: any[];
+    balanceSheet?: any;
+    shareholdingPattern?: any[];
+    shareholdingInsights?: any;
+    salesGrowth10Y?: number;
+    salesGrowth5Y?: number;
+    salesGrowth3Y?: number;
+    profitGrowth10Y?: number;
+    profitGrowth5Y?: number;
+    profitGrowth3Y?: number;
+    cagr5Y?: number;
+    cagr3Y?: number;
+    roe10Y?: number;
+    roe5Y?: number;
+    roe3Y?: number;
+    interestCoverage?: number;
+    swingTradingSignal?: string;
+    longTermSignal?: string;
 }
 
 export type InstrumentType = 'Stock' | 'ETF' | 'MutualFund' | 'Index' | 'Crypto' | 'Unknown';
