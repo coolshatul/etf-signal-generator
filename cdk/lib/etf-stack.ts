@@ -32,13 +32,14 @@ export class EtfStack extends Stack {
             },
         });
 
-        // ⏰ Schedule the Lambda to run hourly from 9:00 AM to 4:00 PM IST
+        // ⏰ Schedule the Lambda to run at 9 AM, 12 PM, and 3 PM IST
         // 9:00 AM IST = 3:30 AM UTC
-        // 4:00 PM IST = 10:30 AM UTC
+        // 12:00 PM IST = 6:30 AM UTC
+        // 3:00 PM IST = 9:30 AM UTC
         new events.Rule(this, 'HourlySignalSchedule', {
             schedule: events.Schedule.cron({
                 minute: '30',
-                hour: '3-10',
+                hour: '3,6,9',
                 weekDay: 'MON-FRI', // Weekdays only
             }),
             targets: [new targets.LambdaFunction(dailySignalLambda)],

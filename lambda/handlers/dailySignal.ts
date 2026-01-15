@@ -2,10 +2,17 @@ import { analyzeNifty50Bullish } from '../services/analyzeNifty50Bullish';
 import { sendBullishStocksAlert } from '../alerts/telegram';
 import { sendBullishStocksEmail } from '../alerts/email';
 import { logBullishSignals } from '../db/mongo';
+import { isTodayHoliday } from '../utils/holidays';
 
 
 export const handler = async (): Promise<void> => {
     console.log('📡 Starting daily Nifty50 bullish stocks scan...');
+
+    // Check if today is an NSE holiday
+    if (isTodayHoliday()) {
+        console.log('🏖️ Today is an NSE holiday. Skipping bullish stocks analysis.');
+        return;
+    }
 
     try {
         const bullishResults = await analyzeNifty50Bullish();

@@ -2,10 +2,17 @@ import { analyzeNifty50EMACrossover } from '../services/analyzeNifty50EMACrossov
 import { sendEMACrossoverAlert } from '../alerts/telegram';
 import { sendEMACrossoverEmail } from '../alerts/email';
 import { logEMACrossoverSignals } from '../db/mongo';
+import { isTodayHoliday } from '../utils/holidays';
 
 
 export const handler = async (): Promise<void> => {
     console.log('📊 Starting daily Nifty50 EMA crossover analysis...');
+
+    // Check if today is an NSE holiday
+    if (isTodayHoliday()) {
+        console.log('🏖️ Today is an NSE holiday. Skipping EMA crossover analysis.');
+        return;
+    }
 
     try {
         const emaCrossoverResults = await analyzeNifty50EMACrossover();
