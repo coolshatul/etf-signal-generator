@@ -47,7 +47,7 @@ export async function fetchHistoricalData(
       results = chartResult.quotes;
 
     if (!results?.length) {
-      throw new Error(`No historical data found for ${symbol}`);
+      return [];
     }
 
     return results.map((item: any) => ({

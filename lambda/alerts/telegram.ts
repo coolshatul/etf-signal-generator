@@ -88,6 +88,12 @@ async function sendLongMessage(fullMessage: string): Promise<void> {
 }
 
 async function getActiveSubscribers(): Promise<number[]> {
+    // If in test mode, only send to the configured admin chat ID
+    if (process.env.TELEGRAM_TEST_MODE === 'true') {
+        console.log('🧪 Test mode active: sending only to admin chat');
+        return [parseInt(chatId)];
+    }
+
     try {
         await connectToDatabase();
         const subscribers = await Subscriber.find({ isActive: true }).select('chatId');

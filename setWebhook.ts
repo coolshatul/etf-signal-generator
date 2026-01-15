@@ -17,7 +17,7 @@ async function setWebhook() {
 
         const response = await axios.post(`https://api.telegram.org/bot${token}/setWebhook`, {
             url: webhookUrl,
-            allowed_updates: ['message']
+            allowed_updates: ['message', 'callback_query']
         });
 
         if (response.data.ok) {
