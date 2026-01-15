@@ -2,6 +2,7 @@ import { Telegraf } from 'telegraf';
 import { fetchFundamentalData } from '../../services/fundamentals';
 import { askGroqForFundamentalAnalysis } from '../../services/groq/aiFundamentalAnalysis';
 import { sendMessage } from '../../utils/sendMessage';
+import { formatFundamentalData } from '../../utils/fundamentalsFormatter';
 
 export async function handleFundamentals(bot: Telegraf<any>, chatId: number, symbol: string) {
     try {
@@ -18,9 +19,8 @@ export async function handleFundamentals(bot: Telegraf<any>, chatId: number, sym
 
         const aiSummary = await askGroqForFundamentalAnalysis(symbol, data);
 
-        const formattedData = Object.entries(data)
-            .map(([key, val]) => `${key}: ${val}`)
-            .join('\n');
+        const formattedData = formatFundamentalData(data);
+
         const response = `📘 *Fundamental Outlook for ${symbol}*\n\n${aiSummary}\n\n📋 *Data Used:*\n\`\`\`\n${formattedData}\n\`\`\``;
 
         await sendMessage(bot, chatId, response);
