@@ -23,6 +23,9 @@ export async function fetchTechnicalData(symbol: string) {
     return {
         symbol,
         date: today.date,
+        open: today.open,
+        high: today.high,
+        low: today.low,
         price: today.close,
         volume: today.volume,
         rsi: today.rsi,
@@ -32,6 +35,7 @@ export async function fetchTechnicalData(symbol: string) {
         ema50: today.ema50,
         macd: today.macd,
         macdSignal: today.macdSignal,
+        macdHistogram: today.macdHistogram,
         atr: today.atr,
         adx: today.adx,
         pdi: today.pdi,
