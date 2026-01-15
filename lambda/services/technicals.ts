@@ -17,20 +17,29 @@ export async function fetchTechnicalData(symbol: string) {
 
     const today = data[data.length - 1];
 
+    console.log(today);
+    
+
     return {
         symbol,
         date: today.date,
         price: today.close,
+        volume: today.volume,
         rsi: today.rsi,
-        emaFast: today.emaFast,
-        emaSlow: today.emaSlow,
+        ema9: today.ema9,
+        ema15: today.ema15,
+        ema21: today.ema21,
+        ema50: today.ema50,
         macd: today.macd,
         macdSignal: today.macdSignal,
         atr: today.atr,
         adx: today.adx,
+        pdi: today.pdi,
+        mdi: today.mdi,
         bbUpper: today.bbUpper,
         bbMiddle: today.bbMiddle,
         bbLower: today.bbLower,
-        avgVolume20: today.avgVolume20
+        avgVolume20: today.avgVolume20,
+        volumeRatio: today.volumeRatio
     };
 }

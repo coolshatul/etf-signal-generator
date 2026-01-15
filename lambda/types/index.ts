@@ -24,11 +24,14 @@ export interface CandleWithIndicators extends Candle {
     macdHistogram: number | null;
     atr: number | null;
     adx: number | null;
+    pdi: number | null;
+    mdi: number | null;
     bbUpper: number | null;
     bbLower: number | null;
     bbMiddle: number | null;
     volEma20: number | null;
     avgVolume20: number | null;
+    volumeRatio: number | null;
 }
 
 // Strategy configuration

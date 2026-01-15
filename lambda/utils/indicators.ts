@@ -76,12 +76,18 @@ export function calculateIndicators(
             macdHistogram: i >= offsetMacd ? macd[i - offsetMacd]?.histogram : null,
             atr: i >= offsetAtr ? atr[i - offsetAtr] : null,
             adx: i >= offsetAdx ? adx[i - offsetAdx]?.adx : null,
+            pdi: i >= offsetAdx ? adx[i - offsetAdx]?.pdi : null,
+            mdi: i >= offsetAdx ? adx[i - offsetAdx]?.mdi : null,
             bbUpper: i >= offsetBbands ? bbands[i - offsetBbands]?.upper : null,
             bbLower: i >= offsetBbands ? bbands[i - offsetBbands]?.lower : null,
             bbMiddle: i >= offsetBbands ? bbands[i - offsetBbands]?.middle : null,
             avgVolume20:
                 i >= 19
                     ? volumes.slice(i - 19, i + 1).reduce((sum, v) => sum + v, 0) / 20
+                    : null,
+            volumeRatio:
+                i >= 19
+                    ? d.volume / (volumes.slice(i - 19, i + 1).reduce((sum, v) => sum + v, 0) / 20)
                     : null,
         };
     });
