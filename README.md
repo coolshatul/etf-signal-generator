@@ -52,7 +52,7 @@ A smart swing-trading strategy powered by momentum and trend indicators — perf
 
 The scanners only act on **completed candles**, never the currently-forming bar:
 
-- **Daily** scans run at 9:00 AM IST (previous close) and 4:00 PM IST (today's final candle) over the ETF universe.
+- **Daily** scans run at 9:00 AM IST and 3:30 PM IST over the ETF universe, each using the last completed daily candle.
 - **Weekly** scans use the last completed week, so the number is stable Monday–Friday.
 - **Intraday** bars are only used after their full duration has elapsed.
 - Invalid/zero/null Yahoo rows are dropped, timestamps are deduped and sorted, and stale series are rejected. Stock candles without volume are discarded rather than treated as zero-volume bars.
