@@ -1,6 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
-import { BullishStockResult, EMA36Result, EMACrossoverResult } from '../types/index.js';
+import { BullishStockResult, EMA36Result } from '../types/index.js';
 import type { PerformanceReport } from '../reports/performanceReport';
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
 import { istDateKey } from '../utils/marketTime';
@@ -455,14 +455,14 @@ export async function sendEMA36Email(ema36Results: EMA36Result[]): Promise<void>
         const html = renderEmailShell({
             title: 'No Weekly Pullback Candidates',
             accent: '#475569',
-            preheader: 'No Nifty 50 stocks are near the 36-week EMA this week.',
+            preheader: 'No ETFs are near the 36-week EMA this week.',
             intro:
                 'The weekly watchlist scan completed. No stocks are currently within 2% below their 36-week EMA.',
             stats: [{ label: 'Candidates', value: '0' }],
             table: '',
             explainerTitle: 'What this scan looks for',
             explainer: [
-                'Stocks trading below the 36-week EMA but within 2% of it.',
+                'ETFs trading below the 36-week EMA but within 2% of it.',
                 'The list is a research watchlist, not a BUY signal.',
                 'No entry, stop or target is implied.'
             ]
@@ -538,122 +538,6 @@ export async function sendEMA36Email(ema36Results: EMA36Result[]): Promise<void>
     console.log(
         `📧 Email alert sent for ${ema36Results.length} weekly pullback candidates`
     );
-}
-
-export async function sendEMACrossoverEmail(emaCrossoverResults: EMACrossoverResult[]): Promise<void> {
-    if (!Array.isArray(emaCrossoverResults)) {
-        throw new Error('Invalid input: EMA crossover results must be an array');
-    }
-
-    if (emaCrossoverResults.length === 0) {
-        const html = renderEmailShell({
-            title: 'No EMA Crossover Signals',
-            accent: '#475569',
-            preheader: 'No 15-minute EMA cascade crossovers were detected.',
-            intro:
-                'The latest intraday scan completed without a qualifying EMA 9/15/50 cascade crossover.',
-            stats: [{ label: 'Signals', value: '0' }],
-            table: '',
-            explainerTitle: 'What this scan looks for',
-            explainer: [
-                'EMA9 crossing EMA15 while the EMA structure aligns with EMA50.',
-                'Only completed 15-minute candles are used.',
-                'Every setup must pass the same stop, target and reward:risk checks as the daily scan.'
-            ]
-        });
-        await sendEmailWithRetry(
-            `NSE 15m EMA Crossovers — none (${getCurrentDate()})`,
-            html
-        );
-        return;
-    }
-
-    const display = [...emaCrossoverResults].slice(0, MAX_EMAIL_SIGNALS);
-    const buys = emaCrossoverResults.filter(result => result.crossoverType === 'BULLISH').length;
-    const sells = emaCrossoverResults.length - buys;
-
-    const rows = display.map(stock => {
-        const isBullish = stock.crossoverType === 'BULLISH';
-        const risk = riskPercent(stock.price, stock.stopLoss);
-        const reward = rewardPercent(stock.price, stock.target);
-        const rr =
-            risk && reward && risk > 0
-                ? (reward / risk).toFixed(1)
-                : null;
-        const timeframe = stock.timeframe ?? '15m';
-        const detail = [
-            timeframe,
-            stock.rsi != null ? `RSI ${stock.rsi.toFixed(1)}` : null,
-            `EMA ${stock.ema9.toFixed(1)} / ${stock.ema15.toFixed(1)} / ${stock.ema50.toFixed(1)}`
-        ]
-            .filter(Boolean)
-            .join(' · ');
-
-        return renderRow([
-            symbolCell(stock.symbol, detail),
-            pill(isBullish ? 'BUY' : 'SELL', isBullish ? 'positive' : 'negative'),
-            stock.stopLoss != null && stock.target != null
-                ? renderLevels([
-                      { label: 'Entry', value: inr(stock.price) },
-                      { label: 'Stop', value: inr(stock.stopLoss), color: '#b91c1c' },
-                      { label: 'Target', value: inr(stock.target), color: '#15803d' }
-                  ])
-                : `<div style="font-size:12px;color:#6b7280;">Levels unavailable</div>`,
-            `<div style="font-size:14px;font-weight:700;color:#111827;">${
-                rr ? `${rr} : 1` : '—'
-            }</div>
-             <div style="font-size:11px;color:#6b7280;line-height:1.45;">${
-                 risk ? `risk ${percent(-risk)}` : ''
-             }${risk && reward ? ' · ' : ''}${reward ? `reward ${percent(reward)}` : ''}</div>`,
-            chartLink(stock.symbol)
-        ]);
-    });
-
-    const averageRr = average(
-        display.map(stock => {
-            const risk = riskPercent(stock.price, stock.stopLoss);
-            const reward = rewardPercent(stock.price, stock.target);
-            return risk && reward ? reward / risk : NaN;
-        })
-    );
-
-    const html = renderEmailShell({
-        title: `${emaCrossoverResults.length} Intraday EMA Crossover${
-            emaCrossoverResults.length === 1 ? '' : 's'
-        }`,
-        accent: '#1d4ed8',
-        preheader: `${buys} BUY and ${sells} SELL 15-minute EMA cascade crossovers with defined levels.`,
-        intro: `The intraday scan detected ${buys} bullish and ${sells} bearish EMA cascade crossover${
-            emaCrossoverResults.length === 1 ? '' : 's'
-        }. A new opposite signal closes the previous position in the tracker.`,
-        stats: [
-            { label: 'Signals', value: String(emaCrossoverResults.length) },
-            { label: 'BUY', value: String(buys), tone: 'positive' },
-            { label: 'SELL', value: String(sells), tone: 'negative' },
-            { label: 'Avg R : R', value: averageRr ? `${averageRr.toFixed(1)} : 1` : '—' }
-        ],
-        table: renderSignalTable(
-            ['ETF', 'Action', 'Entry / Stop / Target', 'Risk : Reward', ''],
-            rows
-        ),
-        explainerTitle: 'How to read the crossover signals',
-        explainer: [
-            'BUY: EMA9 crosses above EMA15 with EMA15 above EMA50. SELL is the mirror image.',
-            'Only completed 15-minute candles are used; entry is the latest completed close.',
-            'A BUY closes any open SELL in the same strategy, and vice versa, as a reversal exit.',
-            'Intraday signals move quickly. Confirm price action and volume before acting, and respect the stop.'
-        ],
-        footnote:
-            emaCrossoverResults.length > MAX_EMAIL_SIGNALS
-                ? `Showing the first ${MAX_EMAIL_SIGNALS} of ${emaCrossoverResults.length} signals.`
-                : undefined
-    });
-
-    await sendEmailWithRetry(
-        `NSE 15m EMA Crossovers — ${buys} BUY / ${sells} SELL (${getCurrentDate()})`,
-        html
-    );
-    console.log(`📧 Email alert sent for ${emaCrossoverResults.length} EMA crossover signals`);
 }
 
 const STRATEGY_LABELS: Record<string, string> = {

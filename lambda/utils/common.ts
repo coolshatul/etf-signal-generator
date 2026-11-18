@@ -30,6 +30,23 @@ export const etfSymbols = [
     'FMCGIETF', 'PSUBNKIETF', 'BSE500IETF',
 ];
 
+// ETFs that actually trade. Threshold is a median daily traded value of
+// roughly Rs 5 crore over the last 120 sessions. Alerts on thinner ETFs would
+// be signals you cannot fill at the quoted price.
+export const liquidEtfSymbols = [
+    'SILVERBEES', 'GOLDBEES', 'NIFTYBEES', 'BANKBEES', 'ITBEES',
+    'JUNIORBEES', 'HDFCSML250', 'MON100', 'PSUBNKBEES', 'PHARMABEES',
+    'MAFANG', 'CPSEETF', 'ALPHA', 'FMCGIETF', 'NIFTYETF', 'MIDCAPETF',
+    'AUTOBEES',
+];
+
+// Stricter subset for intraday scans: roughly Rs 12 crore median daily value,
+// so a 15-minute bar has enough turnover to enter and exit.
+export const intradayEtfSymbols = [
+    'SILVERBEES', 'GOLDBEES', 'NIFTYBEES', 'BANKBEES', 'ITBEES',
+    'JUNIORBEES', 'HDFCSML250', 'MON100', 'PSUBNKBEES', 'PHARMABEES',
+];
+
 // Configuration constants
 export const API_CONFIG = {
     DELAY_MS: 100,  // Delay between API calls to avoid rate limits

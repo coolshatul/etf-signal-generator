@@ -1,7 +1,7 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { EMA36Result } from '../types';
 import { calculateIndicators } from '../utils/indicators';
-import { nifty50Symbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
+import { liquidEtfSymbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
 
 // Configuration
 const CONFIG = {
@@ -11,9 +11,9 @@ const CONFIG = {
 };
 
 /**
- * Analyzes a single stock for EMA36 status
+ * Analyzes a single ETF for EMA36 status
  */
-async function analyzeEMA36Stock(symbol: string): Promise<EMA36Result | null> {
+async function analyzeEMA36Etf(symbol: string): Promise<EMA36Result | null> {
     try {
         // Fetch ~3 years of weekly historical data
         const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.weekly, '1wk');
@@ -61,19 +61,19 @@ async function analyzeEMA36Stock(symbol: string): Promise<EMA36Result | null> {
 }
 
 /**
- * Analyzes Nifty50 stocks for EMA36 signals
- * @returns {Promise<EMA36Result[]>} Array of stocks below or near 36EMA
+ * Analyzes the liquid ETF universe for weekly 36-EMA pullbacks
+ * @returns {Promise<EMA36Result[]>} Array of ETFs below or near the 36-week EMA
  */
-export async function analyzeNifty50EMA36(): Promise<EMA36Result[]> {
-    console.log('📊 Analyzing Nifty50 stocks for EMA36 signals...');
+export async function analyzeEtfWeeklyPullback(): Promise<EMA36Result[]> {
+    console.log('📊 Analyzing ETFs for weekly 36-EMA pullbacks...');
 
-    // Analyze each stock with concurrency control to avoid rate limits
-    const allResults = await processWithConcurrency(nifty50Symbols, analyzeEMA36Stock);
+    // Analyze each ETF with concurrency control to avoid rate limits
+    const allResults = await processWithConcurrency(liquidEtfSymbols, analyzeEMA36Etf);
 
     // Filter out null results
     const results = allResults.filter((result): result is EMA36Result => result !== null);
 
-    console.log(`✅ Found ${results.length} stocks with EMA36 signals out of ${nifty50Symbols.length}`);
+    console.log(`✅ Found ${results.length} ETF pullback candidates out of ${liquidEtfSymbols.length}`);
 
     return results;
 }

@@ -1,4 +1,4 @@
-import { analyzeNifty50EMA36 } from '../services/analyzeNifty50EMA36';
+import { analyzeEtfWeeklyPullback } from '../services/analyzeEtfWeeklyPullback';
 import { sendEMA36Alert } from '../alerts/telegram';
 import { sendEMA36Email } from '../alerts/email';
 import { logEMA36Signals, filterNewSignals } from '../db/mongo';
@@ -14,7 +14,7 @@ const STRATEGY = SIGNAL_STRATEGIES.weeklyPullback;
 const TIMEFRAME = '1wk' as const;
 
 export const handler = async (): Promise<void> => {
-    console.log('📊 Starting daily Nifty50 weekly pullback analysis...');
+    console.log('📊 Starting daily ETF weekly pullback analysis...');
 
     // Check if today is an NSE holiday
     if (isTodayHoliday()) {
@@ -23,7 +23,7 @@ export const handler = async (): Promise<void> => {
     }
 
     try {
-        const ema36Results = await analyzeNifty50EMA36();
+        const ema36Results = await analyzeEtfWeeklyPullback();
 
         // Only alert on new watchlist entries. The weekly candle timestamp is
         // the event key, so the same week does not alert every day.
@@ -73,8 +73,8 @@ export const handler = async (): Promise<void> => {
             `✅ Completed weekly pullback analysis. Found ${newSignals.length} new watchlist entries.`
         );
     } catch (err) {
-        console.error('❌ Error analyzing Nifty50 weekly pullback:', err);
+        console.error('❌ Error analyzing ETF weekly pullback:', err);
     }
 
-    console.log('🎯 Nifty50 weekly pullback analysis completed.');
+    console.log('🎯 ETF weekly pullback analysis completed.');
 };

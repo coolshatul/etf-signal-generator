@@ -27,7 +27,7 @@ import {
     processWithConcurrency,
 } from '../utils/common';
 
-type Universe = 'nifty50' | 'both' | 'etfs';
+type Universe = 'nifty50' | 'both' | 'etfs' | 'custom';
 
 interface Options {
     strategy: BacktestStrategy;
@@ -35,6 +35,7 @@ interface Options {
     days: number;
     limit: number;
     universe: Universe;
+    symbols?: string[];
     legacy: boolean;
     concurrency: number;
 }
@@ -60,13 +61,16 @@ function parseArgs(argv: string[]): Options {
 
     const days = Number(get('days') ?? (timeframe === '1d' ? 730 : 60));
     const limit = Number(get('limit') ?? 50);
-    const universeArg = (get('universe') ?? 'nifty50').toLowerCase();
+    const symbolsArg = get('symbols');
+    const universeArg = (get('universe') ?? (symbolsArg ? 'custom' : 'nifty50')).toLowerCase();
     const universe: Universe =
         universeArg === 'etfs' || universeArg === 'etf'
             ? 'etfs'
             : universeArg === 'both'
               ? 'both'
-              : 'nifty50';
+              : universeArg === 'custom'
+                ? 'custom'
+                : 'nifty50';
     const concurrency = Number(get('concurrency') ?? 5);
 
     return {
@@ -75,6 +79,12 @@ function parseArgs(argv: string[]): Options {
         days: Number.isFinite(days) && days > 0 ? days : 730,
         limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
         universe,
+        symbols: symbolsArg
+            ? symbolsArg
+                  .split(',')
+                  .map(value => value.trim().toUpperCase())
+                  .filter(Boolean)
+            : undefined,
         legacy: argv.includes('--legacy'),
         concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : 5,
     };
@@ -183,11 +193,12 @@ function printSummary(
 async function main(): Promise<void> {
     const options = parseArgs(process.argv.slice(2));
     const universe =
-        options.universe === 'etfs'
+        options.symbols ??
+        (options.universe === 'etfs'
             ? etfSymbols
             : options.universe === 'both'
               ? [...nifty50Symbols, ...niftyNext50Symbols]
-              : nifty50Symbols;
+              : nifty50Symbols);
     const symbols = universe.slice(0, options.limit);
 
     console.log(

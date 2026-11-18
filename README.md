@@ -61,11 +61,19 @@ The scanners only act on **completed candles**, never the currently-forming bar:
 
 ### Universe
 
-The daily bullish scan runs on 33 liquid NSE ETFs (`ETF_BULLISH_SCAN`), with a
-1.5R ATR target, a stop of `max(swing low, EMA50) - 1.5 ATR` capped at 12%, and
-a 45-day holding window. The older Nifty50 stock scan is retained as
-`BULLISH_SCAN` so its historical signals keep their own statistics; it no
-longer runs on a schedule.
+The product is ETF-only.
+
+- **Daily bullish** (`ETF_BULLISH_SCAN`) scans 17 ETFs with at least roughly
+  Rs 5 crore of median daily turnover. Target is 1.5R, stop is
+  `max(swing low, EMA50) - 1.5 ATR` capped at 12%, holding window 45 days.
+- **Weekly pullback** (`WEEKLY_PULLBACK_WATCHLIST`) scans the same universe on
+  weekly candles. It is a research watchlist, not a trade.
+- **Intraday crossover was removed.** On liquid ETFs it produced a profit
+  factor of 0.86 on 15-minute bars and 0.67 on daily bars, so it was not worth
+  running.
+
+Stock signal history lives in the `signals_archive` collection; the live
+`signals` collection only holds ETF rows.
 
 ### Signal identity and dedupe
 
@@ -78,7 +86,7 @@ signalKey = strategy | timeframe | symbol | direction | eventAt
 - The same candle (or the same EMA cross bar) can never alert twice, even after it is stopped out or hits target.
 - Same-day BUY and SELL signals can coexist, and a crossover in the opposite direction closes the open position as `REVERSAL`.
 - If the dedupe lookup cannot reach MongoDB, alerts are **suppressed** rather than risk duplicates.
-- Cooldowns: ETF bullish daily 1 day, crossover 60 minutes, watchlist none.
+- Cooldowns: ETF bullish daily 1 day, watchlist none.
 
 ### Trade validation
 
@@ -160,8 +168,8 @@ Email is the primary channel. A daily bullish alert shows, per stock:
 - links to the chart and the previous signal context
 - a short explainer of what was validated before the alert was sent
 
-Crossover and watchlist emails follow the same layout. Watchlist rows are
-labelled **not a BUY** and carry no trade levels.
+Watchlist emails follow the same layout. Watchlist rows are labelled
+**not a BUY** and carry no trade levels.
 
 Telegram remains available but is off unless `TELEGRAM_ALERTS_ENABLED=true`.
 
@@ -179,7 +187,7 @@ npm run backtest-aligned -- --strategy=bullish --universe=etfs --days=730 --lega
 # Parameter sweep and robustness checks
 npm run sweep-bullish -- --universe=etfs --windows --regime
 
-# EMA crossover on 15-minute bars (Yahoo keeps ~60 days of intraday data)
+# The removed intraday strategy is still measurable for comparison
 npm run backtest-aligned -- --strategy=crossover --timeframe=15m --days=60
 ```
 
@@ -207,7 +215,9 @@ by `RISK_LIMITS`.
 | `npm run test-signal-logic` | Runs signal-identity, trade-level, cost and split tests |
 | `npm run migrate-signal-identity` | Migrates signals to the new `signalKey` schema (`-- --dry-run` to preview) |
 | `npm run repair-signal-data` | Repairs legacy statuses/exit reasons and marks backlog closes (`-- --dry-run` to preview) |
-| `npm run backtest-aligned` | Replays the live rules; `--strategy`, `--timeframe`, `--days`, `--limit`, `--legacy` |
+| `npm run backtest-aligned` | Replays the live rules; `--strategy`, `--timeframe`, `--days`, `--symbols`, `--limit`, `--legacy` |
+| `npm run sweep-bullish` | Parameter sweep and robustness checks for the ETF scan |
+| `npm run archive-signals` | Moves non-ETF history to `signals_archive` (`-- --dry-run` to preview) |
 | `npm run cdk`       | Synthesizes the CDK stack                |
 
 ---

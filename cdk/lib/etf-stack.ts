@@ -125,58 +125,6 @@ export class EtfStack extends Stack {
             targets: [new targets.LambdaFunction(ema36SignalLambda)],
         });
 
-        // 🔄 EMA Crossover signal Lambda function
-        const emaCrossoverSignalLambda = new NodejsFunction(this, 'EMACrossoverSignalLambda', {
-            runtime: lambda.Runtime.NODEJS_22_X,
-            entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMACrossover.ts'),
-            handler: 'handler',
-            // 100 symbols x 20 days of intraday candles routinely takes ~60s.
-            timeout: Duration.seconds(300),
-            memorySize: 512,
-            layers: [sharedDepsLayer],
-            bundling: {
-                minify: true,
-                sourceMap: false,
-                target: 'node22',
-                externalModules: [
-                    'axios',
-                    'chalk',
-                    'groq-sdk',
-                    'mongoose',
-                    'nodemailer',
-                    'rss-parser',
-                    'technicalindicators',
-                    'telegraf',
-                    'vader-sentiment',
-                    'yahoo-finance2'
-                ],
-            },
-            environment: {
-                TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN ?? '',
-                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID ?? '',
-                MONGODB_URI: process.env.MONGODB_URI ?? '',
-                EMAIL_SERVICE: process.env.EMAIL_SERVICE ?? '',
-                EMAIL_USER: process.env.EMAIL_USER ?? '',
-                EMAIL_PASS: process.env.EMAIL_PASS ?? '',
-                EMAIL_FROM: process.env.EMAIL_FROM ?? '',
-                EMAIL_TO: process.env.EMAIL_TO ?? '',
-                TELEGRAM_TEST_MODE: 'false', // Always false in production
-                EMAIL_ALERTS_ENABLED: process.env.EMAIL_ALERTS_ENABLED ?? 'true',
-                TELEGRAM_ALERTS_ENABLED: process.env.TELEGRAM_ALERTS_ENABLED ?? 'false'
-            },
-        });
-
-        // ⏰ Schedule the EMA Crossover Lambda to run every 15 minutes during market hours
-        // Indian market: 9:15 AM - 3:30 PM IST (3:45 AM - 10:15 AM UTC)
-        new events.Rule(this, 'EMACrossoverSignalSchedule', {
-            schedule: events.Schedule.cron({
-                minute: '*/15',  // Every 15 minutes
-                hour: '3-10',    // 3:45 AM to 10:15 AM UTC
-                weekDay: 'MON-FRI', // Weekdays only
-            }),
-            targets: [new targets.LambdaFunction(emaCrossoverSignalLambda)],
-        });
-
         // 🟢 Performance update Lambda function
         const performanceUpdateLambda = new NodejsFunction(this, 'PerformanceUpdateLambda', {
             runtime: lambda.Runtime.NODEJS_22_X,

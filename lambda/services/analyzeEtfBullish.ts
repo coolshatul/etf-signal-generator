@@ -1,7 +1,7 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { BullishStockResult } from '../types';
-import { etfSymbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
+import { liquidEtfSymbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
 import { validateTradeLevels } from '../utils/tradeLevels';
 import { RISK_LIMITS } from '../config/settings';
 import {
@@ -143,7 +143,7 @@ export async function analyzeEtfBullish(): Promise<BullishStockResult[]> {
     console.log(`🌍 Market Regime: ${marketRegime.isBullish ? 'BULLISH' : 'BEARISH'} (${marketRegime.trend})`);
 
     // Analyze each stock with concurrency control to avoid rate limits
-    const results = await processWithConcurrency(etfSymbols, analyzeBullishEtf);
+    const results = await processWithConcurrency(liquidEtfSymbols, analyzeBullishEtf);
 
     // Filter to bullish ETFs only
     let bullishResults = results.filter(r => r.isBullish);
@@ -168,7 +168,7 @@ export async function analyzeEtfBullish(): Promise<BullishStockResult[]> {
         marketRegimeBullish: marketRegime.isBullish
     }));
 
-    console.log(`✅ Found ${bullishResults.length} bullish ETFs out of ${etfSymbols.length}`);
+    console.log(`✅ Found ${bullishResults.length} bullish ETFs out of ${liquidEtfSymbols.length}`);
 
     return bullishResults;
 }
