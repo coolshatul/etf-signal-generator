@@ -219,6 +219,52 @@ export class EtfStack extends Stack {
             targets: [new targets.LambdaFunction(performanceUpdateLambda)],
         });
 
+        // 📈 Weekly performance email. Saturday 10:00 AM IST (4:30 AM UTC)
+        // so it covers the full trading week including Friday's close.
+        const weeklyPerformanceLambda = new NodejsFunction(this, 'WeeklyPerformanceLambda', {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            entry: path.join(__dirname, '../../lambda/handlers/weeklyPerformance.ts'),
+            handler: 'handler',
+            timeout: Duration.seconds(120),
+            memorySize: 256,
+            layers: [sharedDepsLayer],
+            bundling: {
+                minify: true,
+                sourceMap: false,
+                target: 'node20',
+                externalModules: [
+                    'axios',
+                    'chalk',
+                    'groq-sdk',
+                    'mongoose',
+                    'nodemailer',
+                    'rss-parser',
+                    'technicalindicators',
+                    'telegraf',
+                    'vader-sentiment',
+                    'yahoo-finance2'
+                ],
+            },
+            environment: {
+                MONGODB_URI: process.env.MONGODB_URI ?? '',
+                EMAIL_SERVICE: process.env.EMAIL_SERVICE ?? '',
+                EMAIL_USER: process.env.EMAIL_USER ?? '',
+                EMAIL_PASS: process.env.EMAIL_PASS ?? '',
+                EMAIL_FROM: process.env.EMAIL_FROM ?? '',
+                EMAIL_TO: process.env.EMAIL_TO ?? '',
+                EMAIL_ALERTS_ENABLED: process.env.EMAIL_ALERTS_ENABLED ?? 'true'
+            },
+        });
+
+        new events.Rule(this, 'WeeklyPerformanceSchedule', {
+            schedule: events.Schedule.cron({
+                minute: '30',
+                hour: '4',
+                weekDay: 'SAT',
+            }),
+            targets: [new targets.LambdaFunction(weeklyPerformanceLambda)],
+        });
+
         // 🤖 Telegram Webhook Lambda
         const telegramWebhookLambda = new NodejsFunction(this, 'TelegramWebhookLambda', {
             runtime: lambda.Runtime.NODEJS_20_X,

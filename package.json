@@ -13,7 +13,8 @@
     "technicals-mock": "npx ts-node lambda/test/testTechnicalsMock.ts",
     "test-indicators": "npx ts-node lambda/test/testIndicators.ts",
     "test-signal-logic": "npx ts-node lambda/test/testSignalLogic.ts",
-    "migrate-signal-identity": "npx ts-node lambda/scripts/migrateSignalIdentity.ts"
+    "migrate-signal-identity": "npx ts-node lambda/scripts/migrateSignalIdentity.ts",
+    "repair-signal-data": "npx ts-node lambda/scripts/repairSignalData.ts"
   },
   "keywords": [],
   "author": "",

@@ -27,6 +27,7 @@ import {
     computePerformance,
     cumulativeSplitRatio,
     detectUnexplainedGap,
+    isWithinHoldingWindow,
     SplitEvent,
 } from '../utils/performanceMath';
 
@@ -57,7 +58,7 @@ function daysBetween(from: Date, to: Date): number {
     return Math.max(0, Math.round((to.getTime() - from.getTime()) / 86400000));
 }
 
-function normalizeTimeframe(
+export function normalizeTimeframe(
     timeframe: SignalTimeframe | undefined,
     strategy: string
 ): SignalTimeframe {
@@ -547,6 +548,9 @@ export async function updateSignalPerformance(): Promise<void> {
 
         const now = new Date();
         const splitsBySymbol = new Map<string, SplitEvent[]>();
+        // Performance writes are batched: with a large historical backlog,
+        // one round trip per signal would risk the Lambda timeout.
+        const pendingUpdates: any[] = [];
 
         console.log(
             `🔄 Updating performance for ${openSignals.length} open signals across ${groups.size} symbol/timeframe groups...`
@@ -617,9 +621,15 @@ export async function updateSignalPerformance(): Promise<void> {
                         continue;
                     }
 
-                    const eligible = candles.filter(
-                        candle =>
-                            new Date(candle.date).getTime() > entryAt.getTime()
+                    const maxHolding =
+                        MAX_HOLDING_DAYS[signal.strategy] ??
+                        DEFAULT_MAX_HOLDING_DAYS;
+
+                    // Only candles inside the allowed holding window may
+                    // trigger an exit. A stale signal must not inherit a
+                    // stop/target hit that happened months later.
+                    const eligible = candles.filter(candle =>
+                        isWithinHoldingWindow(candle.date, entryAt, maxHolding)
                     );
 
                     // If we have no split events but see a huge gap, do not
@@ -693,9 +703,7 @@ export async function updateSignalPerformance(): Promise<void> {
                     }
 
                     const holdingDays = daysBetween(signal.date, now);
-                    const maxHolding =
-                        MAX_HOLDING_DAYS[signal.strategy] ??
-                        DEFAULT_MAX_HOLDING_DAYS;
+                    const overdueDays = holdingDays - maxHolding;
 
                     if (status === 'OPEN' && holdingDays > maxHolding) {
                         status = 'CLOSED';
@@ -712,22 +720,38 @@ export async function updateSignalPerformance(): Promise<void> {
                         COST_MODEL
                     );
 
-                    await Signal.findByIdAndUpdate(signal._id, {
-                        lastPrice: lastClose,
-                        performancePercent: performance.netPercent,
-                        grossPerformancePercent: performance.grossPercent,
-                        netPerformancePercent: performance.netPercent,
-                        adjustedEntryPrice: adjusted.entry,
-                        status,
-                        exitPrice,
-                        exitDate,
-                        exitReason,
-                        holdingDays,
-                        lastUpdatedAt: now,
-                        metadata: {
-                            ...(signal.metadata ?? {}),
-                            splitRatio: ratio,
-                            performanceTimeframe: timeframe,
+                    const metadata: Record<string, unknown> = {
+                        ...(signal.metadata ?? {}),
+                        splitRatio: ratio,
+                        performanceTimeframe: timeframe,
+                    };
+
+                    // A signal closed long after its holding window is a backlog
+                    // reconciliation, not a trade that closed this week. Mark it
+                    // so the weekly report does not count it as new activity.
+                    if (exitReason === 'MAX_HOLDING' && overdueDays > 2) {
+                        metadata.backlogClose = true;
+                    }
+
+                    pendingUpdates.push({
+                        updateOne: {
+                            filter: { _id: signal._id },
+                            update: {
+                                $set: {
+                                    lastPrice: lastClose,
+                                    performancePercent: performance.netPercent,
+                                    grossPerformancePercent: performance.grossPercent,
+                                    netPerformancePercent: performance.netPercent,
+                                    adjustedEntryPrice: adjusted.entry,
+                                    status,
+                                    exitPrice,
+                                    exitDate,
+                                    exitReason,
+                                    holdingDays,
+                                    lastUpdatedAt: now,
+                                    metadata,
+                                },
+                            },
                         },
                     });
                 }
@@ -735,6 +759,16 @@ export async function updateSignalPerformance(): Promise<void> {
             5,
             100
         );
+
+        if (pendingUpdates.length) {
+            const chunkSize = 500;
+            for (let i = 0; i < pendingUpdates.length; i += chunkSize) {
+                await Signal.bulkWrite(pendingUpdates.slice(i, i + chunkSize), {
+                    ordered: false,
+                });
+            }
+            console.log(`💾 Persisted ${pendingUpdates.length} performance updates.`);
+        }
 
         console.log('✅ Updated all open signals performance.');
     } catch (err) {

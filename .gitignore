@@ -38,3 +38,6 @@ cdk.context.json
 
 # Optional: Ignore test output
 lambda/test/output.json
+
+# Local API response samples (not part of the app)
+fundamental-sample-response.json

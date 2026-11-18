@@ -109,6 +109,35 @@ export interface GapDetection {
 }
 
 /**
+ * Last moment at which a signal may still exit on its stop or target.
+ * Candles after this point belong to an expired signal and must not be used
+ * to infer a stop/target hit.
+ */
+export function holdingWindowEnd(entryAt: Date, maxHoldingDays: number): Date {
+    return new Date(
+        entryAt.getTime() + Math.max(0, maxHoldingDays) * 86400000
+    );
+}
+
+/**
+ * True when a candle is after entry and inside the allowed holding window.
+ * The entry candle itself is excluded so a signal cannot exit on its own bar.
+ */
+export function isWithinHoldingWindow(
+    candleAt: Date | string,
+    entryAt: Date,
+    maxHoldingDays: number
+): boolean {
+    const at = candleAt instanceof Date ? candleAt : new Date(candleAt);
+    if (Number.isNaN(at.getTime())) return false;
+
+    return (
+        at.getTime() > entryAt.getTime() &&
+        at.getTime() <= holdingWindowEnd(entryAt, maxHoldingDays).getTime()
+    );
+}
+
+/**
  * Detect a large unexplained close-to-close gap. Used as a fallback when split
  * events are unavailable: a gap this large is far more likely to be a
  * corporate action than a tradable move, and must not trigger a false stop.

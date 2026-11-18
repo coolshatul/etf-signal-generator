@@ -1,6 +1,7 @@
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 import { BullishStockResult, EMA36Result, EMACrossoverResult } from '../types/index.js';
+import type { PerformanceReport } from '../reports/performanceReport';
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
 import { istDateKey } from '../utils/marketTime';
 
@@ -52,6 +53,15 @@ function displayTime(): string {
         hour12: true,
         timeZone: 'Asia/Kolkata'
     }).format(new Date());
+}
+
+function formatDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata'
+    }).format(date);
 }
 
 function escapeHtml(value: string): string {
@@ -644,4 +654,158 @@ export async function sendEMACrossoverEmail(emaCrossoverResults: EMACrossoverRes
         html
     );
     console.log(`📧 Email alert sent for ${emaCrossoverResults.length} EMA crossover signals`);
+}
+
+const STRATEGY_LABELS: Record<string, string> = {
+    BULLISH_SCAN: 'Bullish swing',
+    EMA_CROSSOVER_SCAN: 'EMA crossover',
+    BULLISH_SCAN_ALERT: 'Legacy bullish',
+    WEEKLY_PULLBACK_WATCHLIST: 'Weekly watchlist'
+};
+
+const EXIT_LABELS: Record<string, string> = {
+    TARGET: 'Target hit',
+    STOP: 'Stop hit',
+    MAX_HOLDING: 'Max holding',
+    REVERSAL: 'Reversal',
+    DELISTED: 'Delisted',
+    MIGRATION: 'Migration',
+    MANUAL: 'Manual'
+};
+
+function strategyLabel(strategy: string): string {
+    return STRATEGY_LABELS[strategy] ?? strategy;
+}
+
+function netCell(value: number | null): string {
+    if (value == null || !Number.isFinite(value)) {
+        return `<span style="color:#9ca3af;">—</span>`;
+    }
+    const color = value >= 0 ? '#15803d' : '#b91c1c';
+    return `<span style="font-weight:700;color:${color};">${percent(value)}</span>`;
+}
+
+export async function sendPerformanceReportEmail(
+    report: PerformanceReport
+): Promise<void> {
+    if (!report || typeof report !== 'object') {
+        throw new Error('Invalid input: performance report is required');
+    }
+
+    const period = `${formatDate(report.from)} – ${formatDate(report.to)}`;
+
+    const strategyRows = report.strategies.map(strategy =>
+        renderRow([
+            `<div style="font-size:13px;font-weight:700;color:#111827;">${escapeHtml(
+                strategyLabel(strategy.strategy)
+            )}</div>
+             <div style="font-size:11px;color:#6b7280;">${escapeHtml(
+                 strategy.timeframe
+             )}</div>`,
+            `<div style="font-size:13px;color:#111827;">${strategy.trades}</div>`,
+            `<div style="font-size:13px;color:#111827;">${strategy.winRate == null ? '—' : `${strategy.winRate.toFixed(1)}%`}</div>`,
+            netCell(strategy.avgNetPercent),
+            `<div style="font-size:11px;line-height:1.5;color:#6b7280;">${
+                strategy.best
+                    ? `Best ${escapeHtml(strategy.best.symbol)} ${netCell(
+                          strategy.best.netPercent
+                      )}`
+                    : '—'
+            }<br>${
+                strategy.worst
+                    ? `Worst ${escapeHtml(strategy.worst.symbol)} ${netCell(
+                          strategy.worst.netPercent
+                      )}`
+                    : ''
+            }</div>`,
+            `<div style="font-size:13px;color:#111827;">${strategy.open}</div>`
+        ])
+    );
+
+    const recentRows = report.recent.map(trade =>
+        renderRow([
+            `<div style="font-size:12px;color:#374151;">${
+                trade.exitDate ? formatDate(trade.exitDate) : '—'
+            }</div>`,
+            symbolCell(trade.symbol, `${strategyLabel(trade.strategy)} · ${trade.timeframe}`),
+            `<div style="font-size:12px;color:#374151;">${escapeHtml(
+                EXIT_LABELS[trade.exitReason ?? ''] ?? trade.exitReason ?? '—'
+            )}</div>`,
+            `<div style="font-size:12px;color:#6b7280;">${
+                trade.holdingDays == null ? '—' : `${trade.holdingDays}d`
+            }</div>`,
+            netCell(trade.netPercent)
+        ])
+    );
+
+    const intro =
+        report.totalClosed > 0
+            ? `${report.totalClosed} position${
+                  report.totalClosed === 1 ? '' : 's'
+              } closed in the last ${report.periodDays} days. ${
+                  report.wins
+              } finished green and ${report.losses} finished red after costs.`
+            : `No positions closed in the last ${report.periodDays} days. There are currently ${report.totalOpen} open position${
+                  report.totalOpen === 1 ? '' : 's'
+              }.`;
+
+    const html = renderEmailShell({
+        title: 'Weekly Performance Report',
+        accent: '#0f766e',
+        preheader: `${report.totalClosed} closed trades, ${
+            report.winRate == null ? 'no' : `${report.winRate.toFixed(1)}%`
+        } win rate.`,
+        intro,
+        stats: [
+            { label: 'Closed', value: String(report.totalClosed) },
+            {
+                label: 'Win Rate',
+                value: report.winRate == null ? '—' : `${report.winRate.toFixed(1)}%`,
+                tone:
+                    report.winRate == null
+                        ? 'neutral'
+                        : report.winRate >= 50
+                          ? 'positive'
+                          : 'negative'
+            },
+            { label: 'Avg Net', value: report.avgNetPercent == null ? '—' : percent(report.avgNetPercent) },
+            { label: 'Open', value: String(report.totalOpen) }
+        ],
+        table:
+            (strategyRows.length
+                ? renderSignalTable(
+                      ['Strategy', 'Trades', 'Win Rate', 'Avg Net', 'Best / Worst', 'Open'],
+                      strategyRows
+                  )
+                : '') +
+            (recentRows.length
+                ? `<div style="font-size:13px;font-weight:700;color:#111827;margin:6px 0 8px;">Recent closed trades</div>` +
+                  renderSignalTable(
+                      ['Date', 'Stock', 'Exit', 'Held', 'Net'],
+                      recentRows
+                  )
+                : ''),
+        explainerTitle: 'How to read this report',
+        explainer: [
+            'Net performance includes the 0.35% round-trip delivery cost plus 5 bps slippage per side.',
+            'A win is any closed trade with a positive net return. Stops and max-holding exits are counted by their realised result.',
+            'Open positions are marked to the latest completed candle and are not counted as wins or losses yet.',
+            'Watchlist entries are not trades and are excluded from these statistics.'
+        ],
+        footnote: `Reporting period: ${period}. ${report.totalOpen} position${
+            report.totalOpen === 1 ? '' : 's'
+        } still open.`
+    });
+
+    await sendEmailWithRetry(
+        `Weekly Performance — ${report.totalClosed} trade${
+            report.totalClosed === 1 ? '' : 's'
+        }, ${
+            report.winRate == null ? 'no' : `${report.winRate.toFixed(1)}%`
+        } win rate (${getCurrentDate()})`,
+        html
+    );
+    console.log(
+        `📧 Weekly performance email sent (${report.totalClosed} closed, ${report.totalOpen} open)`
+    );
 }

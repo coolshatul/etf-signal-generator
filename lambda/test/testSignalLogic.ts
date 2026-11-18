@@ -13,6 +13,8 @@ import {
     computePerformance,
     cumulativeSplitRatio,
     detectUnexplainedGap,
+    holdingWindowEnd,
+    isWithinHoldingWindow,
     DEFAULT_COST_MODEL,
 } from '../utils/performanceMath';
 
@@ -266,6 +268,42 @@ function testSplits() {
     console.log('✅ split adjustment OK');
 }
 
+function testHoldingWindow() {
+    const entryAt = new Date('2026-01-01T00:00:00.000Z');
+
+    assert.strictEqual(
+        holdingWindowEnd(entryAt, 30).toISOString(),
+        '2026-01-31T00:00:00.000Z'
+    );
+
+    // Entry bar itself can never trigger an exit.
+    assert.strictEqual(
+        isWithinHoldingWindow('2026-01-01T00:00:00.000Z', entryAt, 30),
+        false
+    );
+
+    // Inside the window.
+    assert.strictEqual(
+        isWithinHoldingWindow('2026-01-02T00:00:00.000Z', entryAt, 30),
+        true
+    );
+    assert.strictEqual(
+        isWithinHoldingWindow('2026-01-31T00:00:00.000Z', entryAt, 30),
+        true
+    );
+
+    // One day after expiry must be ignored.
+    assert.strictEqual(
+        isWithinHoldingWindow('2026-02-01T00:00:00.000Z', entryAt, 30),
+        false
+    );
+
+    // Bad timestamps are ignored.
+    assert.strictEqual(isWithinHoldingWindow('not-a-date', entryAt, 30), false);
+
+    console.log('✅ holding window OK');
+}
+
 function testGapDetection() {
     const normal = detectUnexplainedGap([
         { date: '2026-01-01', close: 100 },
@@ -309,6 +347,7 @@ try {
     testTradeLevels();
     testPerformanceCosts();
     testSplits();
+    testHoldingWindow();
     testGapDetection();
     console.log('🎉 All signal logic tests passed.');
 } catch (err) {

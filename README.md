@@ -108,6 +108,11 @@ Each email is a single scannable summary:
 - A short “how to use this email” box explaining what was validated and what to do next.
 - Watchlist emails are labelled **not a BUY signal** and show no trade levels.
 
+A **weekly performance email** is sent every Saturday at 10:00 IST. It reports
+closed trades for the week, win rate, average net return, best/worst trades,
+open positions, and a per-strategy breakdown. Backlog reconciliations from the
+migration are excluded so the first report is not inflated.
+
 ### Weekly pullback watchlist
 
 The 36-week EMA scan is a **watchlist**, not a BUY signal. It is stored as
@@ -184,6 +189,7 @@ Backtest triggered BUY today at ₹287.96
 | `npm run test-indicators` | Runs deterministic indicator/session tests |
 | `npm run test-signal-logic` | Runs signal-identity, trade-level, cost and split tests |
 | `npm run migrate-signal-identity` | Migrates signals to the new `signalKey` schema (`-- --dry-run` to preview) |
+| `npm run repair-signal-data` | Repairs legacy statuses/exit reasons and marks backlog closes (`-- --dry-run` to preview) |
 | `npm run cdk`       | Synthesizes the CDK stack                |
 
 ---
