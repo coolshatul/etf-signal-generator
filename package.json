@@ -14,7 +14,8 @@
     "test-indicators": "npx ts-node lambda/test/testIndicators.ts",
     "test-signal-logic": "npx ts-node lambda/test/testSignalLogic.ts",
     "migrate-signal-identity": "npx ts-node lambda/scripts/migrateSignalIdentity.ts",
-    "repair-signal-data": "npx ts-node lambda/scripts/repairSignalData.ts"
+    "repair-signal-data": "npx ts-node lambda/scripts/repairSignalData.ts",
+    "backtest-aligned": "npx ts-node lambda/scripts/runAlignedBacktest.ts"
   },
   "keywords": [],
   "author": "",

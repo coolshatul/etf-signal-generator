@@ -4,17 +4,11 @@ import { BullishStockResult } from '../types';
 import { nifty50Symbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
 import { validateTradeLevels } from '../utils/tradeLevels';
 import { RISK_LIMITS } from '../config/settings';
-
-// Configuration constants
-const CONFIG = {
-    ATR_PERIOD: 14,
-    ATR_MULTIPLIER: 1.5,
-    SWING_DAYS: 50,
-    MIN_DATA_POINTS: 100,
-    RSI_MIN: 40,
-    RSI_MAX: 60,
-    BULLISH_THRESHOLD: 5
-};
+import {
+    BULLISH_RULES,
+    calculateBullishLevels,
+    evaluateBullishEntry,
+} from '../strategy/liveRules';
 
 // Helper function for default response
 function getDefaultResponse(symbol: string): BullishStockResult {
@@ -35,108 +29,12 @@ function getDefaultResponse(symbol: string): BullishStockResult {
     };
 }
 
-// Function to calculate stop-loss and target levels
-function calculateLevels(lastClose: number, swingLow: number, swingHigh: number, ema50: number, atr: number) {
-    // Improved stop-loss: Below swing low or EMA50 (whichever is higher), minus ATR multiplier for buffer
-    const baseStopLevel = Math.max(swingLow, ema50);
-    const stopLoss = Math.max(0, baseStopLevel - (atr * CONFIG.ATR_MULTIPLIER));
-    const stopLossPercent = lastClose > 0 ? ((stopLoss - lastClose) / lastClose) * 100 : 0;
-
-    // Improved target: Aim for 2:1 risk-reward using ATR, or swing high + 5% buffer
-    const riskAmount = Math.max(0, lastClose - stopLoss);
-    const target = Math.max(lastClose + (riskAmount * 2), swingHigh * 1.05);
-    const targetPercent = lastClose > 0 ? ((target - lastClose) / lastClose) * 100 : 0;
-
-    // Calculate risk-reward ratio
-    const denominator = lastClose - stopLoss;
-    const riskRewardRatio = denominator > 0 ? Math.max(0, (target - lastClose) / denominator) : 0;
-
-    return { stopLoss, target, stopLossPercent, targetPercent, riskRewardRatio, baseStopLevel };
-}
-
-// Function to evaluate bullish conditions
-function evaluateBullish(indicators: any, swingLow: number, swingHigh: number) {
-    const {
-        ema10, ema20, ema50, prevEMA20, prevEMA50,
-        rsi, macdHistogram, lastClose, prevClose, prevPrevClose,
-        volume, avgVolume20, obv, prevObv
-    } = indicators;
-
-    // Trend Analysis
-    const isUptrend = lastClose > prevClose;
-    const isAboveEMA10 = lastClose > ema10;
-    const isAboveEMA20 = lastClose > ema20;
-    const isAboveEMA50 = lastClose > ema50;
-
-    // Early exit conditions
-    if (!isUptrend) return { isBullish: false, rating: 0, signals: [] };
-
-    if (!isAboveEMA10 && !isAboveEMA20) return { isBullish: false, rating: 0, signals: [] };
-
-    if (prevPrevClose !== null && lastClose <= prevPrevClose) return { isBullish: false, rating: 0, signals: [] };
-
-    // EMA Structure
-    const isStackedBullish = ema20 > ema50;
-    const ema20Above50 = ema20 > ema50 && prevEMA20 <= prevEMA50;
-
-    // Momentum
-    const rsiInRange = rsi >= CONFIG.RSI_MIN && rsi <= CONFIG.RSI_MAX;
-    const macdPositive = macdHistogram > 0;
-
-    // Volume Analysis
-    const isHighVolume = volume > avgVolume20;
-    const isObvRising = obv > prevObv;
-
-    // Simplified bullish rating (up to 10 points)
-    let rating = 0;
-    const signals = [];
-
-    if (isAboveEMA20) {
-        rating += 2;
-        signals.push('Price above EMA20');
-    }
-
-    if (isAboveEMA50) {
-        rating += 1;
-        signals.push('Price above EMA50');
-    }
-
-    if (isStackedBullish) {
-        rating += 2;
-        signals.push('EMA20 > EMA50');
-    }
-
-    if (ema20Above50) {
-        rating += 2;
-        signals.push('EMA20 cross above EMA50');
-    }
-
-    if (rsiInRange && macdPositive) {
-        rating += 1;
-        signals.push('RSI in range and MACD positive');
-    }
-
-    if (isHighVolume) {
-        rating += 1;
-        signals.push('High volume confirmation');
-    }
-
-    if (isObvRising) {
-        rating += 1;
-        signals.push('OBV trending up');
-    }
-
-    const isBullish = rating >= CONFIG.BULLISH_THRESHOLD;
-
-    return { isBullish, rating, signals };
-}
-
 // Analyze a single stock for bullish signals
 async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> {
     try {
         // Fetch historical data with a standardised lookback
         const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.daily);
-        if (!rawData.length || rawData.length < CONFIG.MIN_DATA_POINTS) {
+        if (!rawData.length || rawData.length < BULLISH_RULES.MIN_DATA_POINTS) {
             return getDefaultResponse(symbol);
         }
 
@@ -165,13 +63,13 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         }
 
         // Calculate swing levels
-        const swingDays = Math.min(CONFIG.SWING_DAYS, dataWithIndicators.length);
+        const swingDays = Math.min(BULLISH_RULES.SWING_DAYS, dataWithIndicators.length);
         const recentData = dataWithIndicators.slice(-swingDays);
         const swingLow = Math.min(...recentData.map(d => d.low));
         const swingHigh = Math.max(...recentData.map(d => d.high));
 
         // Calculate levels
-        const levels = calculateLevels(lastClose, swingLow, swingHigh, ema50, atr);
+        const levels = calculateBullishLevels(lastClose, swingLow, swingHigh, ema50, atr);
 
         // A high score is not enough: the resulting trade must have a sane
         // stop below both the entry and the invalidation level, positive risk,
@@ -191,12 +89,11 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         );
 
         // Evaluate bullish conditions
-        const indicators = {
+        const bullishResult = evaluateBullishEntry({
             ema10, ema20, ema50, prevEMA20, prevEMA50, rsi, macdHistogram, lastClose, prevClose,
             prevPrevClose: prevPrevCandle ? prevPrevCandle.close : null,
             volume, avgVolume20, obv, prevObv
-        };
-        const bullishResult = evaluateBullish(indicators, swingLow, swingHigh);
+        });
 
         if (bullishResult.isBullish && !levelValidation.valid) {
             console.log(

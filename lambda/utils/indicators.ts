@@ -1,5 +1,5 @@
 import { RSI, EMA, MACD, ATR, ADX, BollingerBands, OBV } from 'technicalindicators';
-import { Candle } from '../types';
+import { Candle, CandleWithIndicators } from '../types';
 
 /**
  * Attaches all indicators used by the scanners to each candle.
@@ -14,7 +14,7 @@ export function calculateIndicators(
     rsiPeriod: number = 14,
     emaFast: number = 9,
     emaSlow: number = 21
-): Candle[] {
+): CandleWithIndicators[] {
     if (!Array.isArray(data) || data.length === 0) return [];
 
     const closes = data.map(d => d.close);

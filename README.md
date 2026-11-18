@@ -142,39 +142,43 @@ converts old EMA36 rows into closed watchlist rows, and recreates the indexes.
 
 ---
 
-## 🔔 Telegram Alert Format
+## 🔔 Alert Content
 
-Sample real-time alert for Telegram bots:
+Email is the primary channel. A daily bullish alert shows, per stock:
 
-🚨 Swing Trade Signal Alert 🚨
-📅 Date: 2025-06-28
-📊 ETF: NIFTYBEES
+- entry price, stop loss and target with their percentage distances
+- risk/reward ratio and the signals that produced the score
+- links to the chart and the previous signal context
+- a short explainer of what was validated before the alert was sent
 
-📍 Current Signal: BUY
-📦 Previous Signal: SELL on 2025-06-25 at ₹283.41 (+1.61%)
-💰 Price: ₹287.96
+Crossover and watchlist emails follow the same layout. Watchlist rows are
+labelled **not a BUY** and carry no trade levels.
 
-📈 Indicators:
-- RSI: 65.20 📈 (Bullish)
-- EMA(9): 283.03
-- EMA(21): 280.64
+Telegram remains available but is off unless `TELEGRAM_ALERTS_ENABLED=true`.
 
-🎯 Strategy Settings:
-- Target Profit: 8%
-- Stop Loss: 3%
-- Trailing SL: 2% after 5% gain
+---
 
-🧠 Why this signal?
-Backtest triggered BUY today at ₹287.96
+## 🧪 Backtesting
 
-📊 Backtest Summary:
-- Total Trades: 18
-- Win Rate: 62.5%
-- Profit: 24.2%
-- Annual Return: 14.5%
-- Backtest Days: 365
+`lambda/strategy/liveRules.ts` holds the entry rules. The scanners and the
+backtest both import it, so the backtest cannot drift from what is traded.
 
-⚠️ This is not financial advice. Always do your own research.
+```bash
+# Bullish daily scans over two years, with the old engine for comparison
+npm run backtest-aligned -- --strategy=bullish --days=730 --limit=50 --legacy
+
+# EMA crossover on 15-minute bars (Yahoo keeps ~60 days of intraday data)
+npm run backtest-aligned -- --strategy=crossover --timeframe=15m --days=60
+```
+
+The replay mirrors production exit handling: stop before target within a
+candle, fills at the level, max-holding close at the latest price, one position
+per symbol, and net returns after the configured costs. Open trades are
+reported separately so they cannot flatter the win rate.
+
+`STRATEGY_SETTINGS` (8% target / 3% stop / trailing) belongs to the legacy
+engine and the technicals display only; the scanners use ATR-based levels gated
+by `RISK_LIMITS`.
 
 
 
@@ -191,6 +195,7 @@ Backtest triggered BUY today at ₹287.96
 | `npm run test-signal-logic` | Runs signal-identity, trade-level, cost and split tests |
 | `npm run migrate-signal-identity` | Migrates signals to the new `signalKey` schema (`-- --dry-run` to preview) |
 | `npm run repair-signal-data` | Repairs legacy statuses/exit reasons and marks backlog closes (`-- --dry-run` to preview) |
+| `npm run backtest-aligned` | Replays the live rules; `--strategy`, `--timeframe`, `--days`, `--limit`, `--legacy` |
 | `npm run cdk`       | Synthesizes the CDK stack                |
 
 ---

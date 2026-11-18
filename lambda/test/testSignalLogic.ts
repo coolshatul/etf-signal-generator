@@ -17,6 +17,13 @@ import {
     isWithinHoldingWindow,
     DEFAULT_COST_MODEL,
 } from '../utils/performanceMath';
+import {
+    evaluateBullishEntry,
+    calculateBullishLevels,
+    evaluateCrossoverAt,
+} from '../strategy/liveRules';
+import { backtestSeries, summarise } from '../strategy/alignedBacktest';
+import { CandleWithIndicators } from '../types';
 
 function testSignalIdentity() {
     const eventAt = new Date('2026-11-17T04:15:00.000Z');
@@ -342,6 +349,201 @@ function testGapDetection() {
     console.log('✅ unexplained gap detection OK');
 }
 
+function testLiveRules() {
+    const bullish = evaluateBullishEntry({
+        ema10: 101,
+        ema20: 100,
+        ema50: 95,
+        prevEMA20: 99,
+        prevEMA50: 94,
+        rsi: 50,
+        macdHistogram: 0.5,
+        lastClose: 102,
+        prevClose: 101,
+        prevPrevClose: 100,
+        volume: 2000,
+        avgVolume20: 1500,
+        obv: 200,
+        prevObv: 190,
+    });
+
+    assert.strictEqual(bullish.isBullish, true);
+    assert.ok(bullish.rating >= 5);
+
+    // Below both fast EMAs is an early bail, not a low score.
+    const below = evaluateBullishEntry({
+        ema10: 110,
+        ema20: 108,
+        ema50: 100,
+        prevEMA20: 107,
+        prevEMA50: 99,
+        rsi: 50,
+        macdHistogram: 0.5,
+        lastClose: 105,
+        prevClose: 104,
+        prevPrevClose: 103,
+        volume: 2000,
+        avgVolume20: 1500,
+        obv: 200,
+        prevObv: 190,
+    });
+    assert.strictEqual(below.isBullish, false);
+    assert.strictEqual(below.blockedBy, 'below EMA10 and EMA20');
+
+    // Falling price is rejected before scoring.
+    const falling = evaluateBullishEntry({
+        ema10: 101,
+        ema20: 100,
+        ema50: 95,
+        prevEMA20: 99,
+        prevEMA50: 94,
+        rsi: 50,
+        macdHistogram: 0.5,
+        lastClose: 99,
+        prevClose: 100,
+        prevPrevClose: 98,
+        volume: 2000,
+        avgVolume20: 1500,
+        obv: 200,
+        prevObv: 190,
+    });
+    assert.strictEqual(falling.isBullish, false);
+    assert.strictEqual(falling.blockedBy, 'not up vs previous close');
+
+    const levels = calculateBullishLevels(100, 95, 110, 97, 1);
+    assert.strictEqual(levels.baseStopLevel, 97);
+    assert.strictEqual(levels.stopLoss, 95.5);
+    assert.strictEqual(levels.target, 115.5);
+    assert.ok(levels.riskRewardRatio > 3);
+
+    console.log('✅ live entry rules OK');
+}
+
+function crossoverRow(
+    date: string,
+    close: number,
+    ema9: number,
+    ema15: number,
+    ema50: number,
+    rsi: number
+): CandleWithIndicators {
+    return {
+        date,
+        open: close,
+        high: close + 0.5,
+        low: close - 0.5,
+        close,
+        volume: 1000,
+        ema9,
+        ema15,
+        ema50,
+        rsi,
+    } as unknown as CandleWithIndicators;
+}
+
+function testCrossoverRules() {
+    const rows: CandleWithIndicators[] = [];
+    for (let i = 0; i < 10; i++) {
+        const close = 100;
+        const ema9 = i === 9 ? 100 : 94;
+        const ema15 = 96;
+        const ema50 = 92 + i * 0.2;
+        const rsi = i === 9 ? 55 : 48;
+        rows.push(
+            crossoverRow(
+                `2026-01-${String(i + 1).padStart(2, '0')}`,
+                close,
+                ema9,
+                ema15,
+                ema50,
+                rsi
+            )
+        );
+    }
+
+    const evaluation = evaluateCrossoverAt(rows, 9, {
+        minRiskReward: 1.5,
+        minStopPercent: 0.5,
+        maxStopPercent: 12,
+    });
+
+    assert.strictEqual(evaluation.direction, 'BUY');
+    assert.strictEqual(evaluation.stopLoss, 93.8);
+    assert.ok((evaluation.target ?? 0) > 100);
+
+    // No cross in the last five bars means no signal.
+    const stale = rows.map(row => ({ ...row, ema9: 100 }));
+    const none = evaluateCrossoverAt(stale, 9, {
+        minRiskReward: 1.5,
+        minStopPercent: 0.5,
+        maxStopPercent: 12,
+    });
+    assert.strictEqual(none.direction, null);
+    assert.strictEqual(none.reason, 'no recent cross');
+
+    console.log('✅ crossover rules OK');
+}
+
+function risingSeries(count: number, fallingAfter?: number): CandleWithIndicators[] {
+    const rows: CandleWithIndicators[] = [];
+    for (let i = 0; i < count; i++) {
+        const close =
+            fallingAfter != null && i > fallingAfter
+                ? 100 + fallingAfter * 0.5 - (i - fallingAfter) * 3
+                : 100 + i * 0.5;
+        rows.push({
+            date: new Date(Date.UTC(2026, 0, 1) + i * 86400000).toISOString(),
+            open: close,
+            high: close + 0.4,
+            low: close - 0.4,
+            close,
+            volume: 2000,
+            rsi: 50,
+            macdHistogram: 0.5,
+            ema9: close - 0.1,
+            ema10: close - 0.2,
+            ema15: close - 0.35,
+            ema20: close - 0.5,
+            ema50: close - 2,
+            atr: 1,
+            obv: i,
+            avgVolume20: 1500,
+        } as unknown as CandleWithIndicators);
+    }
+    return rows;
+}
+
+function testAlignedBacktest() {
+    // Rising series: the long target is reached and the result is net of costs.
+    const winners = backtestSeries(
+        'TESTWIN',
+        risingSeries(140),
+        'BULLISH_SCAN',
+        '1d'
+    );
+    assert.ok(winners.trades.length > 0, 'expected at least one trade');
+    assert.strictEqual(winners.trades[0].exitReason, 'TARGET');
+    assert.ok(winners.trades[0].netPercent > 4);
+    assert.ok(winners.trades[0].netPercent < 6);
+
+    const summary = summarise([winners], 'BULLISH_SCAN', '1d');
+    assert.ok(summary.trades >= 1);
+    assert.ok(summary.winRate != null && summary.winRate > 50);
+
+    // Falling series: the stop is hit and the loss includes costs.
+    const losers = backtestSeries(
+        'TESTLOSS',
+        risingSeries(140, 100),
+        'BULLISH_SCAN',
+        '1d'
+    );
+    assert.strictEqual(losers.trades[0].exitReason, 'STOP');
+    assert.ok(losers.trades[0].netPercent < 0);
+    assert.ok(losers.trades[0].netPercent > -4);
+
+    console.log('✅ aligned backtest OK');
+}
+
 try {
     testSignalIdentity();
     testTradeLevels();
@@ -349,6 +551,9 @@ try {
     testSplits();
     testHoldingWindow();
     testGapDetection();
+    testLiveRules();
+    testCrossoverRules();
+    testAlignedBacktest();
     console.log('🎉 All signal logic tests passed.');
 } catch (err) {
     console.error('❌ Signal logic test failed:', err);
