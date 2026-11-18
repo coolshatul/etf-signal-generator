@@ -17,13 +17,13 @@ export class EtfStack extends Stack {
         // 📦 Shared dependencies layer
         const sharedDepsLayer = new lambda.LayerVersion(this, 'SharedDepsLayer', {
             code: lambda.Code.fromAsset(path.join(__dirname, '../layers/shared-deps')),
-            compatibleRuntimes: [lambda.Runtime.NODEJS_20_X],
+            compatibleRuntimes: [lambda.Runtime.NODEJS_22_X],
             description: 'Shared dependencies for Lambda functions',
         });
 
         // 🟡 Daily signal Lambda function
         const dailySignalLambda = new NodejsFunction(this, 'DailySignalLambda', {
-            runtime: lambda.Runtime.NODEJS_20_X,
+            runtime: lambda.Runtime.NODEJS_22_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignal.ts'),
             handler: 'handler',
             timeout: Duration.seconds(180),
@@ -32,7 +32,7 @@ export class EtfStack extends Stack {
             bundling: {
                 minify: true,
                 sourceMap: false,
-                target: 'node20',
+                target: 'node22',
                 externalModules: [
                     'axios',
                     'chalk',
@@ -77,7 +77,7 @@ export class EtfStack extends Stack {
 
         // 🟠 EMA36 signal Lambda function
         const ema36SignalLambda = new NodejsFunction(this, 'EMA36SignalLambda', {
-            runtime: lambda.Runtime.NODEJS_20_X,
+            runtime: lambda.Runtime.NODEJS_22_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMA36.ts'),
             handler: 'handler',
             timeout: Duration.seconds(180),
@@ -86,7 +86,7 @@ export class EtfStack extends Stack {
             bundling: {
                 minify: true,
                 sourceMap: false,
-                target: 'node20',
+                target: 'node22',
                 externalModules: [
                     'axios',
                     'chalk',
@@ -127,7 +127,7 @@ export class EtfStack extends Stack {
 
         // 🔄 EMA Crossover signal Lambda function
         const emaCrossoverSignalLambda = new NodejsFunction(this, 'EMACrossoverSignalLambda', {
-            runtime: lambda.Runtime.NODEJS_20_X,
+            runtime: lambda.Runtime.NODEJS_22_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMACrossover.ts'),
             handler: 'handler',
             // 100 symbols x 20 days of intraday candles routinely takes ~60s.
@@ -137,7 +137,7 @@ export class EtfStack extends Stack {
             bundling: {
                 minify: true,
                 sourceMap: false,
-                target: 'node20',
+                target: 'node22',
                 externalModules: [
                     'axios',
                     'chalk',
@@ -179,7 +179,7 @@ export class EtfStack extends Stack {
 
         // 🟢 Performance update Lambda function
         const performanceUpdateLambda = new NodejsFunction(this, 'PerformanceUpdateLambda', {
-            runtime: lambda.Runtime.NODEJS_20_X,
+            runtime: lambda.Runtime.NODEJS_22_X,
             entry: path.join(__dirname, '../../lambda/handlers/updatePerformance.ts'),
             handler: 'handler',
             // Batched, per-symbol fetches need more than the old 60s budget as
@@ -190,7 +190,7 @@ export class EtfStack extends Stack {
             bundling: {
                 minify: true,
                 sourceMap: false,
-                target: 'node20',
+                target: 'node22',
                 externalModules: [
                     'axios',
                     'chalk',
@@ -222,7 +222,7 @@ export class EtfStack extends Stack {
         // 📈 Weekly performance email. Saturday 10:00 AM IST (4:30 AM UTC)
         // so it covers the full trading week including Friday's close.
         const weeklyPerformanceLambda = new NodejsFunction(this, 'WeeklyPerformanceLambda', {
-            runtime: lambda.Runtime.NODEJS_20_X,
+            runtime: lambda.Runtime.NODEJS_22_X,
             entry: path.join(__dirname, '../../lambda/handlers/weeklyPerformance.ts'),
             handler: 'handler',
             timeout: Duration.seconds(120),
@@ -231,7 +231,7 @@ export class EtfStack extends Stack {
             bundling: {
                 minify: true,
                 sourceMap: false,
-                target: 'node20',
+                target: 'node22',
                 externalModules: [
                     'axios',
                     'chalk',
@@ -267,7 +267,7 @@ export class EtfStack extends Stack {
 
         // 🤖 Telegram Webhook Lambda
         const telegramWebhookLambda = new NodejsFunction(this, 'TelegramWebhookLambda', {
-            runtime: lambda.Runtime.NODEJS_20_X,
+            runtime: lambda.Runtime.NODEJS_22_X,
             entry: path.join(__dirname, '../../lambda/handlers/telegramWebhook.ts'),
             handler: 'handler',
             timeout: Duration.seconds(30),
@@ -275,7 +275,7 @@ export class EtfStack extends Stack {
             bundling: {
                 minify: true,
                 sourceMap: false,
-                target: 'node20',
+                target: 'node22',
                 externalModules: [
                     'axios',
                     'chalk',

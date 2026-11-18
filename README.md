@@ -1,15 +1,16 @@
 # 📈 ETF Swing Trading Signal Generator
 
-An automated swing trading signal generator for Indian ETFs using Node.js, AWS Lambda, and Telegram alerts. It analyzes technical indicators (RSI, EMA, MACD, etc.), runs backtests, and sends daily signals like **BUY**, **SELL**, or **HOLD**.
+An automated swing trading signal generator for Indian ETFs using Node.js, AWS Lambda, and email alerts. It analyzes technical indicators (RSI, EMA, MACD, etc.), runs backtests, and sends daily signals like **BUY**, **SELL**, or **HOLD**.
 
 ---
 
 ## 🚀 Features
 
 - 🧠 Backtested strategy using RSI, EMA, MACD, ADX, ATR, Volume
-- 💬 Telegram alerts with previous signal context
+- 📧 Email alerts with trade levels, risk/reward and previous signal context
+- 💬 Optional Telegram alerts (opt-in via `TELEGRAM_ALERTS_ENABLED=true`)
 - 📊 Signal includes Backtest stats: Win Rate, Profit, CAGR
-- 🕒 Runs daily (Mon–Fri) via scheduled AWS Lambda
+- 🕒 Runs daily (Mon–Fri) via scheduled AWS Lambda on the Node.js 22 runtime
 - ☁️ Fully deployable with AWS CDK
 - 🧪 Local test runner to debug strategies
 
