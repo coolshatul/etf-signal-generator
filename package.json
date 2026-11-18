@@ -15,7 +15,8 @@
     "test-signal-logic": "npx ts-node lambda/test/testSignalLogic.ts",
     "migrate-signal-identity": "npx ts-node lambda/scripts/migrateSignalIdentity.ts",
     "repair-signal-data": "npx ts-node lambda/scripts/repairSignalData.ts",
-    "backtest-aligned": "npx ts-node lambda/scripts/runAlignedBacktest.ts"
+    "backtest-aligned": "npx ts-node lambda/scripts/runAlignedBacktest.ts",
+    "sweep-bullish": "npx ts-node lambda/scripts/sweepBullishParams.ts"
   },
   "keywords": [],
   "author": "",

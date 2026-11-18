@@ -75,7 +75,20 @@ export interface BullishLevels {
  * Bullish scan scoring. Identical to the live scanner: trend and EMA gates
  * first, then a 10-point score with a threshold of 5.
  */
-export function evaluateBullishEntry(input: BullishInputs): BullishEvaluation {
+export interface BullishRuleOverrides {
+    /** Minimum score required to emit a signal (default 5). */
+    threshold?: number;
+    rsiMin?: number;
+    rsiMax?: number;
+}
+
+export function evaluateBullishEntry(
+    input: BullishInputs,
+    overrides: BullishRuleOverrides = {}
+): BullishEvaluation {
+    const threshold = overrides.threshold ?? BULLISH_RULES.BULLISH_THRESHOLD;
+    const rsiMin = overrides.rsiMin ?? BULLISH_RULES.RSI_MIN;
+    const rsiMax = overrides.rsiMax ?? BULLISH_RULES.RSI_MAX;
     const {
         ema10,
         ema20,
@@ -141,7 +154,7 @@ export function evaluateBullishEntry(input: BullishInputs): BullishEvaluation {
     const ema20Above50 = ema20 > ema50 && prevEMA20 <= prevEMA50;
 
     // Momentum
-    const rsiInRange = rsi >= BULLISH_RULES.RSI_MIN && rsi <= BULLISH_RULES.RSI_MAX;
+    const rsiInRange = rsi >= rsiMin && rsi <= rsiMax;
     const macdPositive = macdHistogram > 0;
 
     // Volume Analysis
@@ -187,7 +200,7 @@ export function evaluateBullishEntry(input: BullishInputs): BullishEvaluation {
     }
 
     return {
-        isBullish: rating >= BULLISH_RULES.BULLISH_THRESHOLD,
+        isBullish: rating >= threshold,
         rating,
         signals,
     };
@@ -202,8 +215,14 @@ export function calculateBullishLevels(
     swingLow: number,
     swingHigh: number,
     ema50: number,
-    atr: number
+    atr: number,
+    overrides: { targetRMultiple?: number; swingHighBuffer?: number } = {}
 ): BullishLevels {
+    const targetRMultiple =
+        overrides.targetRMultiple ?? BULLISH_RULES.TARGET_R_MULTIPLE;
+    const swingHighBuffer =
+        overrides.swingHighBuffer ?? BULLISH_RULES.SWING_HIGH_BUFFER;
+
     const baseStopLevel = Math.max(swingLow, ema50);
     const stopLoss = Math.max(
         0,
@@ -214,8 +233,8 @@ export function calculateBullishLevels(
 
     const riskAmount = Math.max(0, lastClose - stopLoss);
     const target = Math.max(
-        lastClose + riskAmount * BULLISH_RULES.TARGET_R_MULTIPLE,
-        swingHigh * BULLISH_RULES.SWING_HIGH_BUFFER
+        lastClose + riskAmount * targetRMultiple,
+        swingHigh * swingHighBuffer
     );
     const targetPercent =
         lastClose > 0 ? ((target - lastClose) / lastClose) * 100 : 0;

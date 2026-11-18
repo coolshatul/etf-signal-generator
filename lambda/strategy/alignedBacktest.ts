@@ -49,6 +49,24 @@ export interface AlignedTrade {
     netPercent: number;
 }
 
+export interface BacktestOverrides {
+    /** Reward multiple used for the bullish ATR target (default 2R). */
+    targetRMultiple?: number;
+    /** Floor applied to the swing-high target (default 1.05). */
+    swingHighBuffer?: number;
+    /** Override the per-strategy holding window in calendar days. */
+    maxHoldingDays?: number;
+    minRiskReward?: number;
+    minStopPercent?: number;
+    maxStopPercent?: number;
+    /** Entry-side experiments. */
+    bullishThreshold?: number;
+    bullishRsiMin?: number;
+    bullishRsiMax?: number;
+    /** Skip entries when ADX is below this value. */
+    minAdx?: number;
+}
+
 export interface SymbolBacktest {
     symbol: string;
     trades: AlignedTrade[];
@@ -141,7 +159,8 @@ export function backtestSeries(
     symbol: string,
     rows: CandleWithIndicators[],
     strategy: BacktestStrategy,
-    timeframe: string
+    timeframe: string,
+    overrides: BacktestOverrides = {}
 ): SymbolBacktest {
     const result: SymbolBacktest = {
         symbol,
@@ -159,11 +178,13 @@ export function backtestSeries(
     if (rows.length <= warmup + 1) return result;
 
     const maxHolding =
-        MAX_HOLDING_DAYS[strategy] ?? DEFAULT_MAX_HOLDING_DAYS;
+        overrides.maxHoldingDays ??
+        MAX_HOLDING_DAYS[strategy] ??
+        DEFAULT_MAX_HOLDING_DAYS;
     const riskLimits = {
-        minRiskReward: RISK_LIMITS.minRiskReward,
-        minStopPercent: RISK_LIMITS.minStopPercent,
-        maxStopPercent: RISK_LIMITS.maxStopPercent,
+        minRiskReward: overrides.minRiskReward ?? RISK_LIMITS.minRiskReward,
+        minStopPercent: overrides.minStopPercent ?? RISK_LIMITS.minStopPercent,
+        maxStopPercent: overrides.maxStopPercent ?? RISK_LIMITS.maxStopPercent,
     };
 
     // Index of the bar the current position is still occupying.
@@ -183,24 +204,39 @@ export function backtestSeries(
             const prevPrev = rows[i - 2];
             if (!prev || !prevPrev) continue;
 
-            const evaluation = evaluateBullishEntry({
-                ema10: bar.ema10,
-                ema20: bar.ema20,
-                ema50: bar.ema50,
-                prevEMA20: prev.ema20,
-                prevEMA50: prev.ema50,
-                rsi: bar.rsi,
-                macdHistogram: bar.macdHistogram,
-                lastClose: bar.close,
-                prevClose: prev.close,
-                prevPrevClose: prevPrev.close,
-                volume: bar.volume,
-                avgVolume20: bar.avgVolume20,
-                obv: bar.obv,
-                prevObv: prev.obv,
-            });
+            const evaluation = evaluateBullishEntry(
+                {
+                    ema10: bar.ema10,
+                    ema20: bar.ema20,
+                    ema50: bar.ema50,
+                    prevEMA20: prev.ema20,
+                    prevEMA50: prev.ema50,
+                    rsi: bar.rsi,
+                    macdHistogram: bar.macdHistogram,
+                    lastClose: bar.close,
+                    prevClose: prev.close,
+                    prevPrevClose: prevPrev.close,
+                    volume: bar.volume,
+                    avgVolume20: bar.avgVolume20,
+                    obv: bar.obv,
+                    prevObv: prev.obv,
+                },
+                {
+                    threshold: overrides.bullishThreshold,
+                    rsiMin: overrides.bullishRsiMin,
+                    rsiMax: overrides.bullishRsiMax,
+                }
+            );
 
             if (!evaluation.isBullish) continue;
+
+            // Optional trend-strength gate used by entry experiments.
+            if (
+                overrides.minAdx != null &&
+                (bar.adx == null || bar.adx < overrides.minAdx)
+            ) {
+                continue;
+            }
 
             // The live scanner needs a valid stop/target before it alerts.
             const swingDays = Math.min(BULLISH_RULES.SWING_DAYS, i + 1);
@@ -215,7 +251,11 @@ export function backtestSeries(
                 swingLow,
                 swingHigh,
                 bar.ema50,
-                bar.atr
+                bar.atr,
+                {
+                    targetRMultiple: overrides.targetRMultiple,
+                    swingHighBuffer: overrides.swingHighBuffer,
+                }
             );
 
             const validation = validateTradeLevels(
