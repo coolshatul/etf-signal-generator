@@ -13,7 +13,11 @@ export async function handlePerformance(bot: Telegraf, chatId: number): Promise<
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         const signals = await Signal.find({
-            date: { $gte: thirtyDaysAgo }
+            date: { $gte: thirtyDaysAgo },
+            // Watchlist entries are research candidates, not trades. Counting
+            // them would silently distort the win rate.
+            signal: { $in: ['BUY', 'SELL'] },
+            status: { $in: ['OPEN', 'HIT_TARGET', 'HIT_SL', 'CLOSED'] },
         }).sort({ date: -1 });
 
         if (!signals.length) {

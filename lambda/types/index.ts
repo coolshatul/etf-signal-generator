@@ -19,6 +19,8 @@ export interface CandleWithIndicators extends Candle {
     ema21: number | null;
     ema36: number | null;
     ema50: number | null;
+    emaFast: number | null;
+    emaSlow: number | null;
     macd: number | null;
     macdSignal: number | null;
     macdHistogram: number | null;
@@ -105,6 +107,25 @@ export interface FundamentalData {
 
 export type InstrumentType = 'Stock' | 'ETF' | 'MutualFund' | 'Index' | 'Crypto' | 'Unknown';
 
+export type SignalTimeframe = '15m' | '1h' | '1d' | '1wk';
+export type SignalDirection = 'BUY' | 'SELL' | 'HOLD';
+export type SignalStatus =
+    | 'OPEN'
+    | 'HIT_TARGET'
+    | 'HIT_SL'
+    | 'CLOSED'
+    | 'WATCHLIST'
+    | 'NEEDS_REVIEW';
+export type SignalSubtype = 'BREAKOUT' | 'PULLBACK' | 'CROSSOVER' | 'WATCHLIST';
+export type ExitReason =
+    | 'TARGET'
+    | 'STOP'
+    | 'MAX_HOLDING'
+    | 'REVERSAL'
+    | 'DELISTED'
+    | 'MIGRATION'
+    | 'MANUAL';
+
 // Result for bullish stock analysis
 export interface BullishStockResult {
     symbol: string;
@@ -121,6 +142,10 @@ export interface BullishStockResult {
     swingHigh: number;
     baseStopLevel: number;
     marketRegimeBullish?: boolean;
+    /** ISO timestamp of the candle the signal was computed from. */
+    asOf?: string;
+    /** Why the candidate was rejected after scoring, if applicable. */
+    rejectionReason?: string;
 }
 
 // Result for EMA36 analysis
@@ -130,6 +155,8 @@ export interface EMA36Result {
     ema36: number;      // 36-period EMA value
     status: 'APPROACHING_BREAKOUT';
     percentDiff: number; // Percentage difference from EMA
+    /** ISO timestamp of the candle the signal was computed from. */
+    asOf?: string;
 }
 
 // Result for EMA crossover analysis
@@ -144,4 +171,10 @@ export interface EMACrossoverResult {
     rsi?: number;       // RSI value at crossover
     stopLoss?: number;  // Recommended stop loss
     target?: number;    // Recommended target
+    /** ISO timestamp of the candle the signal was computed from. */
+    asOf?: string;
+    /** ISO timestamp of the bar where EMA9/15 actually crossed. */
+    crossedAt?: string;
+    /** Timeframe the signal was computed on. */
+    timeframe?: SignalTimeframe;
 }

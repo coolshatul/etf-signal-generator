@@ -1,35 +1,80 @@
 import { analyzeNifty50EMA36 } from '../services/analyzeNifty50EMA36';
 import { sendEMA36Alert } from '../alerts/telegram';
 import { sendEMA36Email } from '../alerts/email';
-import { logEMA36Signals } from '../db/mongo';
+import { logEMA36Signals, filterNewSignals } from '../db/mongo';
 import { isTodayHoliday } from '../utils/holidays';
+import { ALERT_CHANNELS } from '../config/settings';
+import {
+    SIGNAL_STRATEGIES,
+    buildSignalKey,
+    resolveEntryAt,
+} from '../utils/signalIdentity';
 
+const STRATEGY = SIGNAL_STRATEGIES.weeklyPullback;
+const TIMEFRAME = '1wk' as const;
 
 export const handler = async (): Promise<void> => {
-    console.log('📊 Starting daily Nifty50 EMA36 analysis...');
+    console.log('📊 Starting daily Nifty50 weekly pullback analysis...');
 
     // Check if today is an NSE holiday
     if (isTodayHoliday()) {
-        console.log('🏖️ Today is an NSE holiday. Skipping EMA36 analysis.');
+        console.log('🏖️ Today is an NSE holiday. Skipping weekly pullback analysis.');
         return;
     }
 
     try {
         const ema36Results = await analyzeNifty50EMA36();
 
-        // Send Telegram Alert
-        await sendEMA36Alert(ema36Results);
+        // Only alert on new watchlist entries. The weekly candle timestamp is
+        // the event key, so the same week does not alert every day.
+        const { fresh: newSignals, dedupeVerified } = await filterNewSignals(
+            ema36Results,
+            STRATEGY,
+            {
+                timeframe: TIMEFRAME,
+                signalFor: () => 'HOLD',
+                keyFor: result =>
+                    buildSignalKey({
+                        strategy: STRATEGY,
+                        timeframe: TIMEFRAME,
+                        symbol: result.symbol,
+                        direction: 'HOLD',
+                        eventAt: resolveEntryAt(result.asOf),
+                    }),
+            }
+        );
+
+        if (!dedupeVerified) {
+            console.error(
+                '⛔ Dedupe unavailable; skipping watchlist alerts to avoid duplicates.'
+            );
+            return;
+        }
+
+        if (!newSignals.length) {
+            console.log('📭 No new weekly pullback candidates - skipping alerts.');
+            return;
+        }
+
+        // Send Telegram Alert (optional, off unless explicitly enabled)
+        if (ALERT_CHANNELS.telegram) {
+            await sendEMA36Alert(newSignals);
+        }
 
         // Send Email Alert
-        await sendEMA36Email(ema36Results);
+        if (ALERT_CHANNELS.email) {
+            await sendEMA36Email(newSignals);
+        }
 
         // Log to DB
-        await logEMA36Signals(ema36Results);
+        await logEMA36Signals(newSignals);
 
-        console.log(`✅ Completed EMA36 analysis. Found ${ema36Results.length} signals.`);
+        console.log(
+            `✅ Completed weekly pullback analysis. Found ${newSignals.length} new watchlist entries.`
+        );
     } catch (err) {
-        console.error('❌ Error analyzing Nifty50 EMA36:', err);
+        console.error('❌ Error analyzing Nifty50 weekly pullback:', err);
     }
 
-    console.log('🎯 Nifty50 EMA36 analysis completed.');
+    console.log('🎯 Nifty50 weekly pullback analysis completed.');
 };

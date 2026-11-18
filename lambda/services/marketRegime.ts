@@ -1,5 +1,6 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
+import { LOOKBACK_DAYS } from '../utils/common';
 
 export interface MarketRegime {
     isBullish: boolean;
@@ -18,19 +19,19 @@ export async function getMarketRegime(): Promise<MarketRegime> {
     const symbol = '^NSEI'; // Nifty 50 Index
 
     try {
-        const rawData = await fetchHistoricalData(symbol, 100);
+        const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.daily);
         if (!rawData.length) {
             throw new Error('Could not fetch Nifty 50 data');
         }
 
         const dataWithIndicators = calculateIndicators(rawData);
         const lastCandle = dataWithIndicators[dataWithIndicators.length - 1];
-        const prevCandle = dataWithIndicators[dataWithIndicators.length - 10]; // 10 days ago
+        const prevCandle = dataWithIndicators[Math.max(0, dataWithIndicators.length - 10)];
 
         const { close: ltp, ema50, rsi } = lastCandle;
 
-        if (!ema50) {
-            return { isBullish: true, trend: 'UP', ltp, ema50: 0, rsi: rsi || 0, percentFromEMA: 0 };
+        if (ema50 == null) {
+            return { isBullish: false, trend: 'SIDEWAYS', ltp, ema50: 0, rsi: rsi ?? 0, percentFromEMA: 0 };
         }
 
         const percentFromEMA = ((ltp - ema50) / ema50) * 100;
@@ -47,12 +48,12 @@ export async function getMarketRegime(): Promise<MarketRegime> {
             trend,
             ltp,
             ema50,
-            rsi: rsi || 0,
+            rsi: rsi ?? 0,
             percentFromEMA
         };
     } catch (error) {
         console.error('❌ Error fetching market regime:', error);
-        // Default to bullish to not block signals if index data is failing, but log error
-        return { isBullish: true, trend: 'UP', ltp: 0, ema50: 0, rsi: 50, percentFromEMA: 0 };
+        // Fail closed: never treat a data failure as a bullish regime.
+        return { isBullish: false, trend: 'SIDEWAYS', ltp: 0, ema50: 0, rsi: 50, percentFromEMA: 0 };
     }
 }

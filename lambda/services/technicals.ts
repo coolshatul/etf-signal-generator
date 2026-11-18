@@ -1,11 +1,12 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { STRATEGY_SETTINGS } from '../config/settings';
+import { LOOKBACK_DAYS } from '../utils/common';
 
 export async function fetchTechnicalData(symbol: string) {
     console.log(`📊 Analyzing ${symbol} for AI summary...`);
 
-    const rawData = await fetchHistoricalData(symbol, 90); // Fetch 90 days of data for better context
+    const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.daily);
     if (!rawData.length) throw new Error(`No data found for ${symbol}`);
 
     const data = calculateIndicators(

@@ -4,6 +4,7 @@ import { BullishStockResult, EMA36Result, EMACrossoverResult } from '../types/in
 import { TELEGRAM_CONFIG, MESSAGES } from '../utils/common';
 import { connectToDatabase } from '../db/connection';
 import { Subscriber } from '../db/models';
+import { istDateKey } from '../utils/marketTime';
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ const bot = new Telegraf(token);
 
 // Helper functions
 function getCurrentDate(): string {
-    return new Date().toISOString().split('T')[0];
+    return istDateKey(new Date());
 }
 
 function validateInputs(results: any[], type: string): void {
@@ -240,29 +241,30 @@ export async function sendEMA36Alert(ema36Results: EMA36Result[]): Promise<void>
 
     if (ema36Results.length === 0) {
         const noSignalMessage = `
-📉 *No EMA36 Signals Today* 📉
+👀 *No Weekly Pullback Candidates Today* 👀
 📅 *Date:* ${getCurrentDate()}
 
-📊 *Nifty50 EMA36 Analysis Complete*
-No stocks currently below or near the 36-period EMA.
+📊 *Watchlist scan complete (not a BUY signal)*
+No stocks currently below or near the 36-week EMA.
 
 ${MESSAGES.SEPARATOR}
 ${MESSAGES.DISCLAIMER}
         `.trim();
 
         await broadcastMessage(noSignalMessage);
-        console.log('📬 Telegram alert sent: No EMA36 signals');
+        console.log('📬 Telegram alert sent: No weekly pullback candidates');
         return;
     }
 
     const today = getCurrentDate();
 
     let message = `
-📊 *EMA36 Analysis Alert* 📊
+👀 *Weekly Pullback Watchlist* 👀
 📅 *Date:* ${today}
-📈 *Analysis:* Nifty50 Stocks (36-week EMA on Weekly Candles)
+📈 *Analysis:* Nifty50 stocks near the 36-week EMA (weekly candles)
+⚠️ *Not a BUY signal — research candidates only*
 ${MESSAGES.SEPARATOR}
-📉 *Found ${ema36Results.length} Stock(s) Approaching EMA36 Breakout*
+📉 *Found ${ema36Results.length} Watchlist Candidate(s)*
 ${MESSAGES.SEPARATOR}
 
 `;
@@ -291,16 +293,18 @@ ${MESSAGES.SEPARATOR}
     }
 
     message += `${MESSAGES.SEPARATOR}
-🎯 *EMA36 Strategy:*
-- Stocks below 36-week EMA but within 2%
-- Approaching potential breakout from below
-- Weekly trend analysis for longer-term signals
+🎯 *What this means:*
+- Stocks below the 36-week EMA but within 2%
+- Watchlist / research candidates only
+- No entry, stop or target is implied — wait for a confirmed setup
 
 ${MESSAGES.DISCLAIMER}
     `.trim();
 
     await broadcastMessage(message, keyboard);
-    console.log(`📬 Telegram alert sent for ${ema36Results.length} EMA36 signals`);
+    console.log(
+        `📬 Telegram alert sent for ${ema36Results.length} weekly pullback candidates`
+    );
 }
 
 export async function sendEMACrossoverAlert(emaCrossoverResults: EMACrossoverResult[]): Promise<void> {

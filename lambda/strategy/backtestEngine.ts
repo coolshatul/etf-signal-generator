@@ -54,9 +54,11 @@ export function backtestStrategy(data: any[]): Result {
 
     // Skip if any required indicator is missing
     if (
-      !rsi || !emaFast || !emaSlow || !macd || !macdSignal ||
-      !adx || !atr || !bbUpper || !avgVolume20 || !volume
+      rsi == null || emaFast == null || emaSlow == null || macd == null || macdSignal == null ||
+      adx == null || atr == null || bbUpper == null || avgVolume20 == null || !volume
     ) continue;
+
+    if (prev1.rsi == null || prev2.rsi == null || prev3.rsi == null) continue;
 
     // --- Entry (Buy) Logic ---
     // Check for uptrend in RSI over last 3 days
@@ -163,10 +165,11 @@ export function backtestStrategy(data: any[]): Result {
   }
 
   // Return trades and summary
+  const closedTrades = trades.filter(t => t.type === 'SELL').length;
   return {
     trades,
     summary: {
-      totalTrades: trades.length / 2, // Each trade is a buy+sell pair
+      totalTrades: closedTrades, // Each completed trade is a buy+sell pair
       totalProfit: `${totalProfit.toFixed(2)}%`,
       annualReturn: `${(annualReturn * 100).toFixed(2)}%`,
       beatsFD: annualReturn * 100 > 7, // Compare to fixed deposit rate

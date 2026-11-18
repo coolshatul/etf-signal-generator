@@ -1,7 +1,9 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { EMACrossoverResult } from '../types';
 import { calculateIndicators } from '../utils/indicators';
-import { nifty50Symbols, niftyNext50Symbols, processWithConcurrency } from '../utils/common';
+import { nifty50Symbols, niftyNext50Symbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
+import { validateTradeLevels } from '../utils/tradeLevels';
+import { RISK_LIMITS } from '../config/settings';
 
 // Configuration
 const CONFIG = {
@@ -23,10 +25,18 @@ async function analyzeEMACrossoverStock(
     timeframe: Timeframe = '15m'
 ): Promise<EMACrossoverResult | null> {
     try {
-        // Map timeframe to days to fetch
-        const daysToFetch = timeframe === '1wk' ? 1000 : timeframe === '1d' ? 365 : 30;
+        // `fetchHistoricalData` expects a calendar-day lookback. Intraday
+        // scans need enough calendar span to survive weekends/holidays, so
+        // request 20 days for 15m and 40 days for 1h.
+        const lookbackDays = timeframe === '1wk'
+            ? LOOKBACK_DAYS.weekly
+            : timeframe === '1d'
+                ? LOOKBACK_DAYS.daily
+                : timeframe === '1h'
+                    ? LOOKBACK_DAYS.oneHour
+                    : LOOKBACK_DAYS.fifteenMinutes;
 
-        const rawData = await fetchHistoricalData(symbol, daysToFetch, timeframe);
+        const rawData = await fetchHistoricalData(symbol, lookbackDays, timeframe);
         if (!rawData.length || rawData.length < CONFIG.MIN_DATA_POINTS) {
             return null;
         }
@@ -39,7 +49,7 @@ async function analyzeEMACrossoverStock(
         const { close: price, ema9, ema15, ema50, rsi } = last;
 
         // Ensure current indicators are available
-        if (ema9 === null || ema15 === null || ema50 === null || rsi === null) {
+        if (ema9 == null || ema15 == null || ema50 == null || rsi == null) {
             return null;
         }
 
@@ -53,26 +63,31 @@ async function analyzeEMACrossoverStock(
 
         // 2. Trend Confirmation (EMA50 Slope over last few candles)
         const prevEMA50 = dataWithIndicators[lastIndex - 3]?.ema50;
-        if (prevEMA50 === null) return null;
+        if (prevEMA50 == null) return null;
         const isTrendBullish = ema50 > prevEMA50;
         const isTrendBearish = ema50 < prevEMA50;
 
         // 3. Detect RECENT crossover within lookback period
         let hasRecentCrossover = false;
+        let crossedAt: string | null = null;
         const lookbackStart = Math.max(1, lastIndex - CONFIG.LOOKBACK_PERIODS);
 
         for (let i = lastIndex; i > lookbackStart; i--) {
             const current = dataWithIndicators[i];
             const previous = dataWithIndicators[i - 1];
+            if (!current || !previous) continue;
+            if (current.ema9 == null || current.ema15 == null || previous.ema9 == null || previous.ema15 == null) continue;
 
             if (isBullishStructure) {
                 if (previous.ema9 <= previous.ema15 && current.ema9 > current.ema15) {
                     hasRecentCrossover = true;
+                    crossedAt = current.date;
                     break;
                 }
             } else if (isBearishStructure) {
                 if (previous.ema9 >= previous.ema15 && current.ema9 < current.ema15) {
                     hasRecentCrossover = true;
+                    crossedAt = current.date;
                     break;
                 }
             }
@@ -109,6 +124,23 @@ async function analyzeEMACrossoverStock(
                 ? price + (risk * CONFIG.RISK_REWARD_RATIO)
                 : price - (risk * CONFIG.RISK_REWARD_RATIO);
 
+            const direction = isBullishStructure ? 'BUY' : 'SELL';
+            const levelValidation = validateTradeLevels(
+                { direction, entry: price, stopLoss, target },
+                {
+                    minRiskReward: RISK_LIMITS.minRiskReward,
+                    minStopPercent: RISK_LIMITS.minStopPercent,
+                    maxStopPercent: RISK_LIMITS.maxStopPercent,
+                }
+            );
+
+            if (!levelValidation.valid) {
+                console.log(
+                    `⚠️ ${symbol}: ${timeframe} crossover levels rejected - ${levelValidation.reason}`
+                );
+                return null;
+            }
+
             return {
                 symbol,
                 price,
@@ -119,7 +151,10 @@ async function analyzeEMACrossoverStock(
                 stopLoss,
                 target,
                 crossoverType,
-                signal: `Recent ${crossoverType.toLowerCase()} EMA cross on ${timeframe} with ${rsi.toFixed(1)} RSI. Price near ${nearEMAs.join(', ')}.`
+                signal: `Recent ${crossoverType.toLowerCase()} EMA cross on ${timeframe} with ${rsi.toFixed(1)} RSI. Price near ${nearEMAs.join(', ')}.`,
+                asOf: last.date,
+                crossedAt: crossedAt ?? last.date,
+                timeframe,
             };
         }
 

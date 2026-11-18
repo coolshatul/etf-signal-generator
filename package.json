@@ -10,7 +10,10 @@
     "fundamental-local": "npx ts-node lambda/test/testFundamentalData.ts",
     "news-local": "npx ts-node lambda/test/testNews.ts",
     "technicals-local": "npx ts-node lambda/test/testTechnicals.ts",
-    "technicals-mock": "npx ts-node lambda/test/testTechnicalsMock.ts"
+    "technicals-mock": "npx ts-node lambda/test/testTechnicalsMock.ts",
+    "test-indicators": "npx ts-node lambda/test/testIndicators.ts",
+    "test-signal-logic": "npx ts-node lambda/test/testSignalLogic.ts",
+    "migrate-signal-identity": "npx ts-node lambda/scripts/migrateSignalIdentity.ts"
   },
   "keywords": [],
   "author": "",

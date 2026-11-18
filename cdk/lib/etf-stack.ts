@@ -26,7 +26,8 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignal.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(60),
+            timeout: Duration.seconds(180),
+            memorySize: 512,
             layers: [sharedDepsLayer],
             bundling: {
                 minify: true,
@@ -54,18 +55,21 @@ export class EtfStack extends Stack {
                 EMAIL_PASS: process.env.EMAIL_PASS ?? '',
                 EMAIL_FROM: process.env.EMAIL_FROM ?? '',
                 EMAIL_TO: process.env.EMAIL_TO ?? '',
-                TELEGRAM_TEST_MODE: 'false' // Always false in production
+                TELEGRAM_TEST_MODE: 'false', // Always false in production
+                EMAIL_ALERTS_ENABLED: process.env.EMAIL_ALERTS_ENABLED ?? 'true',
+                TELEGRAM_ALERTS_ENABLED: process.env.TELEGRAM_ALERTS_ENABLED ?? 'false'
             },
         });
 
-        // ⏰ Schedule the Lambda to run at 9 AM, 12 PM, and 3 PM IST
-        // 9:00 AM IST = 3:30 AM UTC
-        // 12:00 PM IST = 6:30 AM UTC
-        // 3:00 PM IST = 9:30 AM UTC
+        // ⏰ Schedule the Lambda to run at 9:00 AM IST (pre-open retry using the
+        // previous close) and 4:00 PM IST (after the session closes, using
+        // today's final candle).
+        // 9:00 AM IST  = 3:30 AM UTC
+        // 4:00 PM IST  = 10:30 AM UTC
         new events.Rule(this, 'HourlySignalSchedule', {
             schedule: events.Schedule.cron({
                 minute: '30',
-                hour: '3,6,9',
+                hour: '3,10',
                 weekDay: 'MON-FRI', // Weekdays only
             }),
             targets: [new targets.LambdaFunction(dailySignalLambda)],
@@ -76,7 +80,8 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMA36.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(60),
+            timeout: Duration.seconds(180),
+            memorySize: 512,
             layers: [sharedDepsLayer],
             bundling: {
                 minify: true,
@@ -104,7 +109,9 @@ export class EtfStack extends Stack {
                 EMAIL_PASS: process.env.EMAIL_PASS ?? '',
                 EMAIL_FROM: process.env.EMAIL_FROM ?? '',
                 EMAIL_TO: process.env.EMAIL_TO ?? '',
-                TELEGRAM_TEST_MODE: 'false' // Always false in production
+                TELEGRAM_TEST_MODE: 'false', // Always false in production
+                EMAIL_ALERTS_ENABLED: process.env.EMAIL_ALERTS_ENABLED ?? 'true',
+                TELEGRAM_ALERTS_ENABLED: process.env.TELEGRAM_ALERTS_ENABLED ?? 'false'
             },
         });
 
@@ -123,7 +130,9 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/dailySignalEMACrossover.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(60),
+            // 100 symbols x 20 days of intraday candles routinely takes ~60s.
+            timeout: Duration.seconds(300),
+            memorySize: 512,
             layers: [sharedDepsLayer],
             bundling: {
                 minify: true,
@@ -151,7 +160,9 @@ export class EtfStack extends Stack {
                 EMAIL_PASS: process.env.EMAIL_PASS ?? '',
                 EMAIL_FROM: process.env.EMAIL_FROM ?? '',
                 EMAIL_TO: process.env.EMAIL_TO ?? '',
-                TELEGRAM_TEST_MODE: 'false' // Always false in production
+                TELEGRAM_TEST_MODE: 'false', // Always false in production
+                EMAIL_ALERTS_ENABLED: process.env.EMAIL_ALERTS_ENABLED ?? 'true',
+                TELEGRAM_ALERTS_ENABLED: process.env.TELEGRAM_ALERTS_ENABLED ?? 'false'
             },
         });
 
@@ -171,7 +182,10 @@ export class EtfStack extends Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: path.join(__dirname, '../../lambda/handlers/updatePerformance.ts'),
             handler: 'handler',
-            timeout: Duration.seconds(60),
+            // Batched, per-symbol fetches need more than the old 60s budget as
+            // signals accumulate.
+            timeout: Duration.seconds(300),
+            memorySize: 512,
             layers: [sharedDepsLayer],
             bundling: {
                 minify: true,

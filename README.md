@@ -47,6 +47,95 @@ A smart swing-trading strategy powered by momentum and trend indicators — perf
 
 ---
 
+## 🛡️ Signal Integrity
+
+The scanners only act on **completed candles**, never the currently-forming bar:
+
+- **Daily** scans run at 9:00 AM IST (previous close) and 4:00 PM IST (today's final candle).
+- **Weekly** scans use the last completed week, so the number is stable Monday–Friday.
+- **Intraday** bars are only used after their full duration has elapsed.
+- Invalid/zero/null Yahoo rows are dropped, timestamps are deduped and sorted, and stale series are rejected. Stock candles without volume are discarded rather than treated as zero-volume bars.
+- Alerts fire only on **new** signals. A position that is already open is not re-alerted every run.
+- Performance tracking checks intrabar **high/low** (not just the close), handles long and short signals, and closes stale signals after a per-strategy holding period.
+
+### Signal identity and dedupe
+
+Every stored signal has an immutable key:
+
+```
+signalKey = strategy | timeframe | symbol | direction | eventAt
+```
+
+- The same candle (or the same EMA cross bar) can never alert twice, even after it is stopped out or hits target.
+- Same-day BUY and SELL signals can coexist, and a crossover in the opposite direction closes the open position as `REVERSAL`.
+- If the dedupe lookup cannot reach MongoDB, alerts are **suppressed** rather than risk duplicates.
+- Cooldowns: bullish daily 1 day, crossover 60 minutes, watchlist none.
+
+### Trade validation
+
+A scored candidate is not a signal until its levels make sense:
+
+- BUY: `stop < entry < target`; SELL: `target < entry < stop`.
+- Minimum reward:risk **1.5**.
+- Stop distance between **0.5%** and **12%** of entry.
+- Rejected candidates are logged with a reason and never alerted.
+
+### Costs and corporate actions
+
+- Performance is stored gross and net. Net subtracts **0.35%** round-trip costs plus **5 bps** slippage per side.
+- `performancePercent` remains the net number for backwards compatibility.
+- Yahoo split events adjust stored entry/stop/target into post-split terms before evaluating levels.
+- A >35% gap with no split event is flagged `NEEDS_REVIEW` instead of being treated as a stop.
+
+### Alert channels
+
+Email is the primary alert channel. Telegram is optional and **off by default**:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `EMAIL_ALERTS_ENABLED` | `true` | Send the scan summary by email |
+| `TELEGRAM_ALERTS_ENABLED` | `false` | Set to `true` to resume Telegram broadcasts |
+
+Signal logging to MongoDB always happens, regardless of channel settings.
+
+### Email layout
+
+Each email is a single scannable summary:
+
+- Header with the scan name, date and IST time.
+- Summary stats (signal count, BUY/SELL split, average R:R, average stop risk).
+- One row per stock: action, entry/stop/target, risk %, reward % and a chart link.
+- A short “how to use this email” box explaining what was validated and what to do next.
+- Watchlist emails are labelled **not a BUY signal** and show no trade levels.
+
+### Weekly pullback watchlist
+
+The 36-week EMA scan is a **watchlist**, not a BUY signal. It is stored as
+`strategy: WEEKLY_PULLBACK_WATCHLIST`, `signal: HOLD`, `status: WATCHLIST`,
+and is excluded from trade performance and win-rate calculations.
+
+Run the deterministic tests with:
+
+```bash
+npm run test-indicators
+npm run test-signal-logic
+```
+
+### Migrating existing signal data
+
+The old `{ symbol, date, strategy }` unique index must be replaced before
+deploying the new writers. Preview first, then apply:
+
+```bash
+npm run migrate-signal-identity -- --dry-run
+npm run migrate-signal-identity
+```
+
+The migration drops the legacy index, backfills `signalKey`/`entryAt`/`timeframe`,
+converts old EMA36 rows into closed watchlist rows, and recreates the indexes.
+
+---
+
 ## 🔔 Telegram Alert Format
 
 Sample real-time alert for Telegram bots:
@@ -92,6 +181,9 @@ Backtest triggered BUY today at ₹287.96
 |---------------------|------------------------------------------|
 | `npm run deploy`    | Deploys Lambda using AWS CDK             |
 | `npm run test-local`| Runs strategy locally with test ETF      |
+| `npm run test-indicators` | Runs deterministic indicator/session tests |
+| `npm run test-signal-logic` | Runs signal-identity, trade-level, cost and split tests |
+| `npm run migrate-signal-identity` | Migrates signals to the new `signalKey` schema (`-- --dry-run` to preview) |
 | `npm run cdk`       | Synthesizes the CDK stack                |
 
 ---

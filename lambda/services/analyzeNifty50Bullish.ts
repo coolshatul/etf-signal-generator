@@ -1,7 +1,9 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { BullishStockResult } from '../types';
-import { nifty50Symbols, processWithConcurrency } from '../utils/common';
+import { nifty50Symbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
+import { validateTradeLevels } from '../utils/tradeLevels';
+import { RISK_LIMITS } from '../config/settings';
 
 // Configuration constants
 const CONFIG = {
@@ -132,8 +134,8 @@ function evaluateBullish(indicators: any, swingLow: number, swingHigh: number) {
 // Analyze a single stock for bullish signals
 async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> {
     try {
-        // Fetch historical data (200 days for sufficient data)
-        const rawData = await fetchHistoricalData(symbol, 200);
+        // Fetch historical data with a standardised lookback
+        const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.daily);
         if (!rawData.length || rawData.length < CONFIG.MIN_DATA_POINTS) {
             return getDefaultResponse(symbol);
         }
@@ -148,8 +150,17 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         const { close: lastClose, ema10, ema20, ema50, rsi, macdHistogram, atr, volume, avgVolume20, obv } = lastCandle;
         const { close: prevClose, ema20: prevEMA20, ema50: prevEMA50, obv: prevObv } = prevCandle;
 
-        // Early validation
+        // Early validation. Comparisons against null coerce to 0 in JS and can
+        // create false "above EMA" signals, so bail out explicitly.
         if (lastClose <= 0 || prevClose <= 0) {
+            return getDefaultResponse(symbol);
+        }
+        if (
+            ema10 == null || ema20 == null || ema50 == null ||
+            rsi == null || macdHistogram == null || atr == null ||
+            avgVolume20 == null || obv == null || prevObv == null ||
+            prevEMA20 == null || prevEMA50 == null
+        ) {
             return getDefaultResponse(symbol);
         }
 
@@ -162,6 +173,23 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         // Calculate levels
         const levels = calculateLevels(lastClose, swingLow, swingHigh, ema50, atr);
 
+        // A high score is not enough: the resulting trade must have a sane
+        // stop below both the entry and the invalidation level, positive risk,
+        // and an acceptable reward:risk ratio.
+        const levelValidation = validateTradeLevels(
+            {
+                direction: 'BUY',
+                entry: lastClose,
+                stopLoss: levels.stopLoss,
+                target: levels.target,
+            },
+            {
+                minRiskReward: RISK_LIMITS.minRiskReward,
+                minStopPercent: RISK_LIMITS.minStopPercent,
+                maxStopPercent: RISK_LIMITS.maxStopPercent,
+            }
+        );
+
         // Evaluate bullish conditions
         const indicators = {
             ema10, ema20, ema50, prevEMA20, prevEMA50, rsi, macdHistogram, lastClose, prevClose,
@@ -170,13 +198,33 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
         };
         const bullishResult = evaluateBullish(indicators, swingLow, swingHigh);
 
+        if (bullishResult.isBullish && !levelValidation.valid) {
+            console.log(
+                `⚠️ ${symbol}: bullish score ${bullishResult.rating}/10 rejected - ${levelValidation.reason}`
+            );
+            return {
+                symbol,
+                price: lastClose,
+                ...bullishResult,
+                isBullish: false,
+                ...levels,
+                riskRewardRatio: levelValidation.riskRewardRatio,
+                swingLow,
+                swingHigh,
+                asOf: lastCandle.date,
+                rejectionReason: levelValidation.reason,
+            };
+        }
+
         return {
             symbol,
             price: lastClose,
             ...bullishResult,
             ...levels,
+            riskRewardRatio: levelValidation.riskRewardRatio,
             swingLow,
-            swingHigh
+            swingHigh,
+            asOf: lastCandle.date,
         };
     } catch (error) {
         console.error(`Error analyzing ${symbol}:`, error);
@@ -202,6 +250,20 @@ export async function analyzeNifty50Bullish(): Promise<BullishStockResult[]> {
 
     // Filter to bullish stocks only
     let bullishResults = results.filter(r => r.isBullish);
+
+    // Surface rejected candidates so weak levels are visible in logs.
+    const rejected = results.filter(r => r.rejectionReason);
+    if (rejected.length) {
+        const reasons = new Map<string, number>();
+        for (const result of rejected) {
+            const reason = result.rejectionReason ?? 'unknown';
+            reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+        }
+        const summary = [...reasons.entries()]
+            .map(([reason, count]) => `${count}x ${reason}`)
+            .join('; ');
+        console.log(`⚠️ Rejected ${rejected.length} bullish candidates: ${summary}`);
+    }
 
     // Filter based on market regime (Don't suppress, just flag)
     bullishResults = bullishResults.map(r => ({

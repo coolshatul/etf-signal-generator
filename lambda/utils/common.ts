@@ -11,7 +11,7 @@ export const nifty50Symbols = [
 ];
 
 export const niftyNext50Symbols = [
-    'VBL', 'BAJAJHLDNG', 'HINDZINC', 'VEDL', 'ADANIGREEN', 'LTIM', 'INDHOTEL', 'HAL', 'ENRIN', 'ADANIENSOL',
+    'VBL', 'BAJAJHLDNG', 'HINDZINC', 'VEDL', 'ADANIGREEN', 'INDHOTEL', 'HAL', 'ENRIN', 'ADANIENSOL',
     'JINDALSTEL', 'BANKBARODA', 'CHOLAFIN', 'HAVELLS', 'HYUNDAI', 'TVSMOTOR', 'UNITDSPR', 'ZYDUSLIFE', 'BRITANNIA', 'MOTHERSON',
     'JSWENERGY', 'AMBUJACEM', 'GODREJCP', 'MAZDOCK', 'PIDILITIND', 'DLF', 'CANBK', 'PNB', 'ADANIPOWER', 'BAJAJHFL',
     'SOLARINDS', 'DMART', 'SIEMENS', 'DIVISLAB', 'RECLTD', 'TORNTPHARM', 'LODHA', 'ICICIGI', 'IRFC', 'TATAPOWER',
@@ -23,6 +23,15 @@ export const API_CONFIG = {
     DELAY_MS: 100,  // Delay between API calls to avoid rate limits
     CONCURRENCY_LIMIT: 5  // Maximum concurrent API calls
 };
+
+// Standardised lookbacks (calendar days) so indicator seeds are consistent
+// across scanners. EMA values depend on where the series starts.
+export const LOOKBACK_DAYS = {
+    daily: 365,          // ~250 trading days
+    weekly: 1095,        // ~3 years
+    fifteenMinutes: 20,  // enough bars to survive weekends/holidays
+    oneHour: 40,
+} as const;
 
 export const TELEGRAM_CONFIG = {
     MAX_MESSAGE_LENGTH: 4096,

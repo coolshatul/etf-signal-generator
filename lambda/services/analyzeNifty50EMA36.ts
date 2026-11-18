@@ -1,7 +1,7 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { EMA36Result } from '../types';
 import { calculateIndicators } from '../utils/indicators';
-import { nifty50Symbols, processWithConcurrency } from '../utils/common';
+import { nifty50Symbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
 
 // Configuration
 const CONFIG = {
@@ -15,8 +15,8 @@ const CONFIG = {
  */
 async function analyzeEMA36Stock(symbol: string): Promise<EMA36Result | null> {
     try {
-        // Fetch ~3 years of weekly historical data (156 weeks ≈ 3 years)
-        const rawData = await fetchHistoricalData(symbol, 1095, '1wk'); // 3 years in days
+        // Fetch ~3 years of weekly historical data
+        const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.weekly, '1wk');
 
         if (!rawData.length || rawData.length < CONFIG.MIN_DATA_POINTS) {
             return null;
@@ -48,7 +48,8 @@ async function analyzeEMA36Stock(symbol: string): Promise<EMA36Result | null> {
                 ltp,
                 ema36,
                 status,
-                percentDiff
+                percentDiff,
+                asOf: lastCandle.date,
             };
         }
 

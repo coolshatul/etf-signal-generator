@@ -1,4 +1,6 @@
 // NSE Holidays for 2026
+import { istDateKey } from './marketTime';
+
 export const NSE_HOLIDAYS_2026 = [
   '2026-01-15', // Municipal Corporation Election - Maharashtra
   '2026-01-26', // Republic Day
@@ -23,10 +25,7 @@ export const NSE_HOLIDAYS_2026 = [
  * @returns true if today is a holiday, false otherwise
  */
 export function isTodayHoliday(): boolean {
-  const today = new Date();
-  const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-  return NSE_HOLIDAYS_2026.includes(todayString);
+  return NSE_HOLIDAYS_2026.includes(istDateKey(new Date()));
 }
 
 /**
@@ -35,9 +34,7 @@ export function isTodayHoliday(): boolean {
  * @returns true if the date is a holiday, false otherwise
  */
 export function isHoliday(date: Date): boolean {
-  const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-  return NSE_HOLIDAYS_2026.includes(dateString);
+  return NSE_HOLIDAYS_2026.includes(istDateKey(date));
 }
 
 /**
