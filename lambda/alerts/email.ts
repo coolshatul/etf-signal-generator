@@ -377,6 +377,10 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
         const reward = Math.abs(stock.targetPercent || 0);
         const detail = `Rating ${stock.rating}/10${
             stock.signals.length ? ` · ${stock.signals.slice(0, 2).join(' · ')}` : ''
+        }${
+            stock.maxEntry
+                ? ` · enter at next open ≤ ${inr(stock.maxEntry)}`
+                : ''
         }`;
 
         return renderRow([
@@ -402,14 +406,16 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
     const regime = bullishResults[0]?.marketRegimeBullish;
 
     const html = renderEmailShell({
-        title: `${bullishResults.length} Bullish Swing Setup${
+        title: `${bullishResults.length} ETF Setup${
             bullishResults.length === 1 ? '' : 's'
-        }`,
+        } for the Next Session`,
         accent: '#166534',
-        preheader: `${bullishResults.length} ETFs passed the bullish screen with defined stop and target levels.`,
-        intro: `The daily scan found ${bullishResults.length} ETF${
+        preheader: `${bullishResults.length} ETF${
+            bullishResults.length === 1 ? ' is' : 's are'
+        } set up. Enter at the next open only below the stated ceiling.`,
+        intro: `The scan found ${bullishResults.length} ETF${
             bullishResults.length === 1 ? '' : 's'
-        } with a valid bullish structure. Every setup below has a defined stop, target and at least a 1.5:1 reward-to-risk ratio.`,
+        } with a valid bullish structure. The price shown is the completed close that triggered the setup. Enter at the next session's open, and only if that open is at or below the ceiling for the trade.`,
         stats: [
             { label: 'Signals', value: String(bullishResults.length) },
             { label: 'Avg R : R', value: averageRr ? `${averageRr.toFixed(1)} : 1` : '—' },
@@ -426,10 +432,11 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
         ),
         explainerTitle: 'How to use this email',
         explainer: [
-            'Entry is the last completed daily close. Stop and target are derived from swing structure and ATR volatility.',
-            'Signals with less than 1.5:1 reward:risk, a stop closer than 0.5%, or a stop wider than 12% are rejected before they reach this email.',
+            'The signal price is the last completed daily close. Your entry is the next session open, so the fill can differ from the price shown.',
+            'The ceiling is the highest open that still keeps the stop within 12% and the reward at least equal to the risk. If the open is above it, skip the trade.',
+            'Signals with less than 1.5:1 reward:risk at the signal close are rejected before they reach this email.',
             'These are research alerts, not buy orders. Size positions so a stop-out costs a fixed small percentage of your capital.',
-            'Prices exclude the ~0.35% round-trip delivery cost and slippage.'
+            'Reported performance is net of ~0.35% round-trip costs plus slippage.'
         ],
         footnote:
             bullishResults.length > MAX_EMAIL_SIGNALS

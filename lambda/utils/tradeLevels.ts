@@ -38,6 +38,24 @@ function finitePositive(value: number): boolean {
 }
 
 /**
+ * Highest entry price that still satisfies the risk rules:
+ *   - stop distance no wider than the configured maximum
+ *   - reward at least equal to risk (1:1 floor)
+ * Used to turn an alert into an executable instruction: "enter only if the
+ * next open is at or below this price".
+ */
+export function maxValidEntry(
+    stopLoss: number,
+    target: number,
+    maxStopPercent: number = DEFAULT_MAX_STOP_PERCENT
+): number {
+    if (!Number.isFinite(stopLoss) || stopLoss <= 0) return 0;
+    const maxByStop = stopLoss / (1 - maxStopPercent / 100);
+    const maxByReward = (target + stopLoss) / 2;
+    return Math.min(maxByStop, maxByReward);
+}
+
+/**
  * Validate that a trade has a sane, positive-risk structure.
  *
  * BUY : stop < entry < target

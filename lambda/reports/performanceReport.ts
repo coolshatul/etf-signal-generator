@@ -85,6 +85,8 @@ export async function buildPerformanceReport(
         Signal.find({
             signal: { $in: ['BUY', 'SELL'] },
             status: { $in: CLOSED_STATUSES },
+            // Rejected entries were never trades.
+            exitReason: { $ne: 'ENTRY_INVALID' },
             // Backlog reconciliations are historical, not this week's activity.
             'metadata.backlogClose': { $ne: true },
             $or: [

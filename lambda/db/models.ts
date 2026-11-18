@@ -61,7 +61,19 @@ export interface ISignal extends Document {
     crossedAt?: Date;
     signal: SignalDirection;
     subtype?: SignalSubtype;
+    /** Signal price: the completed close the rules were evaluated on. */
     price: number;
+    /** How the entry is assumed to happen. */
+    entryModel?: 'signal_close' | 'next_open';
+    /** Executable entry once known (next session's open). */
+    modelEntry?: number;
+    /** Highest open that still satisfies the risk rules. */
+    maxEntry?: number;
+    /** Reward:risk measured from the actual entry. */
+    entryRiskReward?: number;
+    /** Set once the alert email has been sent. */
+    alertedAt?: Date;
+    strategyVersion?: number;
     lastPrice?: number;
     /** Net performance (kept for backward compatibility). */
     performancePercent?: number;
@@ -123,6 +135,27 @@ const SignalSchema: Schema = new Schema({
     price: {
         type: Number,
         required: true
+    },
+    entryModel: {
+        type: String,
+        enum: ['signal_close', 'next_open'],
+        default: 'signal_close'
+    },
+    modelEntry: {
+        type: Number
+    },
+    maxEntry: {
+        type: Number
+    },
+    entryRiskReward: {
+        type: Number
+    },
+    alertedAt: {
+        type: Date
+    },
+    strategyVersion: {
+        type: Number,
+        default: 1
     },
     lastPrice: {
         type: Number

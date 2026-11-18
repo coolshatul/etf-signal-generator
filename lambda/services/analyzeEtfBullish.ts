@@ -2,7 +2,7 @@ import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { BullishStockResult } from '../types';
 import { liquidEtfSymbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
-import { validateTradeLevels } from '../utils/tradeLevels';
+import { maxValidEntry, validateTradeLevels } from '../utils/tradeLevels';
 import { RISK_LIMITS } from '../config/settings';
 import {
     BULLISH_RULES,
@@ -74,6 +74,12 @@ async function analyzeBullishEtf(symbol: string): Promise<BullishStockResult> {
         // A high score is not enough: the resulting trade must have a sane
         // stop below both the entry and the invalidation level, positive risk,
         // and an acceptable reward:risk ratio.
+        const maxEntry = maxValidEntry(
+            levels.stopLoss,
+            levels.target,
+            RISK_LIMITS.maxStopPercent
+        );
+
         const levelValidation = validateTradeLevels(
             {
                 direction: 'BUY',
@@ -108,6 +114,7 @@ async function analyzeBullishEtf(symbol: string): Promise<BullishStockResult> {
                 riskRewardRatio: levelValidation.riskRewardRatio,
                 swingLow,
                 swingHigh,
+                maxEntry,
                 asOf: lastCandle.date,
                 rejectionReason: levelValidation.reason,
             };
@@ -121,6 +128,7 @@ async function analyzeBullishEtf(symbol: string): Promise<BullishStockResult> {
             riskRewardRatio: levelValidation.riskRewardRatio,
             swingLow,
             swingHigh,
+            maxEntry,
             asOf: lastCandle.date,
         };
     } catch (error) {

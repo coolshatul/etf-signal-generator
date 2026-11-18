@@ -15,6 +15,7 @@ import {
     backtestSeries,
     SymbolBacktest,
     summarise,
+    truncateAtDataGlitches,
 } from '../strategy/alignedBacktest';
 import { backtestStrategy } from '../strategy/backtestEngine';
 import { fetchHistoricalData } from '../utils/fetchData';
@@ -36,6 +37,7 @@ interface Options {
     limit: number;
     universe: Universe;
     symbols?: string[];
+    entryModel: 'signal_close' | 'next_open';
     legacy: boolean;
     concurrency: number;
 }
@@ -71,6 +73,8 @@ function parseArgs(argv: string[]): Options {
               : universeArg === 'custom'
                 ? 'custom'
                 : 'nifty50';
+    const entryModel =
+        get('entry') === 'signal_close' ? 'signal_close' : 'next_open';
     const concurrency = Number(get('concurrency') ?? 5);
 
     return {
@@ -85,6 +89,7 @@ function parseArgs(argv: string[]): Options {
                   .map(value => value.trim().toUpperCase())
                   .filter(Boolean)
             : undefined,
+        entryModel,
         legacy: argv.includes('--legacy'),
         concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : 5,
     };
@@ -119,7 +124,18 @@ async function loadSymbol(
         if (!candles.length) {
             return { symbol, rows: [], error: 'no data' };
         }
-        return { symbol, rows: calculateIndicators(candles) };
+
+        const cleaned = truncateAtDataGlitches(candles);
+        if (cleaned.droppedBars > 0) {
+            console.log(
+                `⚠️ ${symbol}: dropped ${cleaned.droppedBars} bars before ${cleaned.lastGlitch?.slice(
+                    0,
+                    10
+                )} (price-scale jump)`
+            );
+        }
+
+        return { symbol, rows: calculateIndicators(cleaned.rows) };
     } catch (err: any) {
         return { symbol, rows: [], error: err?.message ?? String(err) };
     }
@@ -127,13 +143,16 @@ async function loadSymbol(
 
 function printSummary(
     summary: ReturnType<typeof summarise>,
-    buyHold: number | null
+    buyHold: number | null,
+    entryModel: Options['entryModel']
 ): void {
     const line = (label: string, value: string) =>
         console.log(`  ${label.padEnd(22)} ${value}`);
 
     console.log('');
-    console.log(`📊 ${summary.strategy} · ${summary.timeframe}`);
+    console.log(
+        `📊 ${summary.strategy} · ${summary.timeframe} · entry ${entryModel}`
+    );
     console.log('─'.repeat(52));
     line('Symbols', String(summary.symbols));
     line(
@@ -155,6 +174,7 @@ function printSummary(
     line('Total net (sum)', formatPercent(summary.totalNetPercent));
     line('Profit factor', formatRatio(summary.profitFactor));
     line('Avg holding', summary.avgHoldingDays == null ? '—' : `${summary.avgHoldingDays.toFixed(1)}d`);
+    line('Max losing streak', String(summary.maxConsecutiveLosses));
     line(
         'Exits',
         `stop ${summary.exits.STOP} · target ${summary.exits.TARGET} · max-hold ${summary.exits.MAX_HOLDING}`
@@ -180,6 +200,23 @@ function printSummary(
             : '—'
     );
     line('Buy & hold (equal wt)', formatPercent(buyHold));
+
+    if (summary.yearly.length) {
+        console.log('');
+        console.log('  Year    Trades  Win%    AvgNet   TotalNet');
+        for (const row of summary.yearly) {
+            console.log(
+                `  ${String(row.year).padEnd(7)} ${String(row.trades).padStart(
+                    5
+                )}  ${(row.winRate == null
+                    ? '—'
+                    : row.winRate.toFixed(1) + '%'
+                ).padStart(6)}  ${formatPercent(row.avgNetPercent).padStart(
+                    7
+                )}  ${formatPercent(row.totalNetPercent).padStart(9)}`
+            );
+        }
+    }
 
     if (summary.rejectionReasons.length) {
         console.log('');
@@ -225,7 +262,13 @@ async function main(): Promise<void> {
     const usable = loaded.filter(item => !item.error && item.rows.length);
 
     const runs: SymbolBacktest[] = usable.map(item =>
-        backtestSeries(item.symbol, item.rows, options.strategy, options.timeframe)
+        backtestSeries(
+            item.symbol,
+            item.rows,
+            options.strategy,
+            options.timeframe,
+            { entryModel: options.entryModel }
+        )
     );
 
     const summary = summarise(runs, options.strategy, options.timeframe);
@@ -245,7 +288,7 @@ async function main(): Promise<void> {
           buyHoldReturns.length
         : null;
 
-    printSummary(summary, buyHold);
+    printSummary(summary, buyHold, options.entryModel);
 
     // Per-symbol spread, useful for spotting a few names carrying the result.
     const perSymbol = runs

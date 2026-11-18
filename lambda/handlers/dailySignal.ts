@@ -1,7 +1,12 @@
 import { analyzeEtfBullish } from '../services/analyzeEtfBullish';
 import { sendBullishStocksAlert } from '../alerts/telegram';
 import { sendBullishStocksEmail } from '../alerts/email';
-import { logBullishSignals, filterNewSignals } from '../db/mongo';
+import {
+    filterNewSignals,
+    getUnsentSignals,
+    logBullishSignals,
+    markAlertsSent,
+} from '../db/mongo';
 import { isTodayHoliday } from '../utils/holidays';
 import { ALERT_CHANNELS, DEDUPE_COOLDOWN_MS } from '../config/settings';
 import {
@@ -9,9 +14,36 @@ import {
     buildSignalKey,
     resolveEntryAt,
 } from '../utils/signalIdentity';
+import { BullishStockResult } from '../types';
+import { ISignal } from '../db/models';
 
 const STRATEGY = SIGNAL_STRATEGIES.etfBullish;
 const TIMEFRAME = '1d' as const;
+
+/**
+ * Rebuild the alert shape from a stored row. Used by the retry path when a
+ * previous run persisted a signal but failed to deliver the email.
+ */
+function toAlertResult(doc: ISignal): BullishStockResult {
+    return {
+        symbol: doc.symbol,
+        isBullish: true,
+        rating: doc.rating,
+        price: doc.price,
+        signals: doc.signals ?? [],
+        stopLoss: doc.stopLoss,
+        target: doc.target,
+        stopLossPercent: doc.metadata?.stopLossPercent ?? 0,
+        targetPercent: doc.metadata?.targetPercent ?? 0,
+        riskRewardRatio: doc.riskRewardRatio,
+        swingLow: doc.metadata?.swingLow ?? 0,
+        swingHigh: doc.metadata?.swingHigh ?? 0,
+        baseStopLevel: 0,
+        maxEntry: doc.maxEntry,
+        marketRegimeBullish: doc.metadata?.marketRegimeBullish,
+        asOf: doc.metadata?.asOf,
+    };
+}
 
 export const handler = async (): Promise<void> => {
     console.log('📡 Starting daily ETF bullish scan...');
@@ -27,7 +59,7 @@ export const handler = async (): Promise<void> => {
 
         // Only alert on positions that are not already open and whose exact
         // signal event has not been seen before.
-        const { fresh: newSignals, dedupeVerified } = await filterNewSignals(
+        const { fresh, dedupeVerified } = await filterNewSignals(
             bullishResults,
             STRATEGY,
             {
@@ -51,26 +83,35 @@ export const handler = async (): Promise<void> => {
             return;
         }
 
-        if (!newSignals.length) {
+        // Persist first. The alert is only marked as sent after delivery, so a
+        // failed email is retried instead of silently dropped.
+        if (fresh.length) {
+            await logBullishSignals(fresh, STRATEGY, TIMEFRAME);
+        }
+
+        const pending = await getUnsentSignals(STRATEGY);
+
+        if (!pending.length) {
             console.log('📭 No new bullish signals - skipping alerts.');
             return;
         }
 
-        // Send Telegram Alert (optional, off unless explicitly enabled)
+        const alertResults = pending.map(toAlertResult);
+
         if (ALERT_CHANNELS.telegram) {
-            await sendBullishStocksAlert(newSignals);
+            await sendBullishStocksAlert(alertResults);
         }
 
-        // Send Email Alert
         if (ALERT_CHANNELS.email) {
-            await sendBullishStocksEmail(newSignals);
+            await sendBullishStocksEmail(alertResults);
         }
 
-        // Log to DB
-        await logBullishSignals(newSignals, STRATEGY, TIMEFRAME);
+        await markAlertsSent(pending.map(doc => String(doc._id)));
 
         console.log(
-            `✅ Completed ETF bullish analysis. Found ${newSignals.length} new signals.`
+            `✅ ETF bullish scan complete. Alerts sent for ${alertResults.length} signal${
+                alertResults.length === 1 ? '' : 's'
+            }.`
         );
     } catch (err) {
         console.error('❌ Error analyzing ETFs:', err);

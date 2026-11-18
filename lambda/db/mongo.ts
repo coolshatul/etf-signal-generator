@@ -1,5 +1,5 @@
 import { connectToDatabase } from './connection';
-import { Signal } from './models';
+import { ISignal, Signal } from './models';
 import {
     BullishStockResult,
     EMA36Result,
@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { fetchHistoricalData, fetchCorporateActions } from '../utils/fetchData';
 import { processWithConcurrency } from '../utils/common';
+import { maxValidEntry } from '../utils/tradeLevels';
 import {
     buildSignalKey,
     resolveEntryAt,
@@ -27,6 +28,7 @@ import {
     computePerformance,
     cumulativeSplitRatio,
     detectUnexplainedGap,
+    holdingWindowEnd,
     isWithinHoldingWindow,
     SplitEvent,
 } from '../utils/performanceMath';
@@ -213,12 +215,24 @@ export async function filterNewSignals<T extends { symbol: string; asOf?: string
  * by the caller's dedupe pass, otherwise rows land under a different identity
  * than the one that was just checked.
  */
+/**
+ * Highest open that still satisfies the risk rules for a signal:
+ *   - stop distance no wider than maxStopPercent
+ *   - reward at least equal to risk (1:1 floor)
+ * The 1.5 screen already ran at signal time; a gap can erode it.
+ */
+export function computeMaxEntry(stopLoss: number, target: number): number {
+    return maxValidEntry(stopLoss, target, RISK_LIMITS.maxStopPercent);
+}
+
 export async function logBullishSignals(
     results: BullishStockResult[],
     strategy: string = SIGNAL_STRATEGIES.etfBullish,
     timeframe: SignalTimeframe = '1d'
-): Promise<void> {
-    if (!results.length) return;
+): Promise<string[]> {
+    if (!results.length) return [];
+
+    const ids: string[] = [];
 
     try {
         await connectToDatabase();
@@ -241,6 +255,9 @@ export async function logBullishSignals(
                 timeframe,
                 signal: 'BUY' as const,
                 price: result.price,
+                entryModel: 'next_open' as const,
+                maxEntry: computeMaxEntry(result.stopLoss, result.target),
+                strategyVersion: 1,
                 rating: result.rating,
                 signals: result.signals,
                 stopLoss: result.stopLoss,
@@ -255,19 +272,67 @@ export async function logBullishSignals(
                     targetPercent: result.targetPercent,
                     marketRegimeBullish: result.marketRegimeBullish,
                     asOf: entryAt.toISOString(),
+                    strategyConfig: {
+                        entryModel: 'next_open',
+                        targetRMultiple: 1.5,
+                        maxStopPercent: RISK_LIMITS.maxStopPercent,
+                        minRiskReward: RISK_LIMITS.minRiskReward,
+                        maxHoldingDays:
+                            MAX_HOLDING_DAYS[strategy] ??
+                            DEFAULT_MAX_HOLDING_DAYS,
+                    },
                 },
             };
 
-            await Signal.findOneAndUpdate({ signalKey }, signal, {
-                upsert: true,
-                new: true,
-            });
+            // alertedAt is only initialised on insert. Re-running a scan must
+            // never resurrect an alert that was already delivered.
+            const doc = await Signal.findOneAndUpdate(
+                { signalKey },
+                {
+                    $set: signal,
+                    $setOnInsert: { alertedAt: null },
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+
+            if (doc?._id) ids.push(String(doc._id));
         }
 
         console.log(`✅ Logged ${results.length} bullish signals to MongoDB.`);
     } catch (err) {
         console.error('❌ Error logging signals to MongoDB:', err);
     }
+
+    return ids;
+}
+
+/**
+ * Signals whose alert was never delivered. Used by the retry path so a failed
+ * email does not silently drop a signal.
+ */
+export async function getUnsentSignals(
+    strategy: string,
+    limit = 25
+): Promise<ISignal[]> {
+    await connectToDatabase();
+
+    return Signal.find({
+        strategy,
+        status: 'OPEN',
+        alertedAt: null,
+        signal: 'BUY',
+    })
+        .sort({ entryAt: 1 })
+        .limit(limit);
+}
+
+export async function markAlertsSent(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    await connectToDatabase();
+    await Signal.updateMany(
+        { _id: { $in: ids } },
+        { $set: { alertedAt: new Date() } }
+    );
 }
 
 /**
@@ -625,6 +690,77 @@ export async function updateSignalPerformance(): Promise<void> {
                         continue;
                     }
 
+                    const isNextOpen = signal.entryModel === 'next_open';
+
+                    // Executable model: the fill is the next session's open.
+                    // Levels stay absolute; only the derived risk is remeasured.
+                    let entryPrice = adjusted.entry;
+                    let entryBarIndex = -1;
+                    let entryAtActual = entryAt;
+
+                    if (isNextOpen) {
+                        entryBarIndex = candles.findIndex(
+                            candle =>
+                                new Date(candle.date).getTime() >
+                                entryAt.getTime()
+                        );
+
+                        // The next session has not printed yet.
+                        if (entryBarIndex < 0) continue;
+
+                        const entryBar = candles[entryBarIndex];
+                        const fill = Number(entryBar.open) / ratio;
+
+                        if (!Number.isFinite(fill) || fill <= 0) {
+                            await markNeedsReview(
+                                signal,
+                                now,
+                                'invalid next-open fill'
+                            );
+                            continue;
+                        }
+
+                        const stopBroken =
+                            adjusted.stopLoss != null &&
+                            (direction === 'BUY'
+                                ? fill <= adjusted.stopLoss
+                                : fill >= adjusted.stopLoss);
+
+                        const ceiling =
+                            signal.maxEntry != null
+                                ? signal.maxEntry / ratio
+                                : Infinity;
+
+                        if (stopBroken || fill > ceiling) {
+                            pendingUpdates.push({
+                                updateOne: {
+                                    filter: { _id: signal._id },
+                                    update: {
+                                        $set: {
+                                            modelEntry: fill,
+                                            status: 'CLOSED',
+                                            exitReason: 'ENTRY_INVALID',
+                                            exitDate: new Date(entryBar.date),
+                                            lastUpdatedAt: now,
+                                            metadata: {
+                                                ...(signal.metadata ?? {}),
+                                                entryRejected: true,
+                                                entryCeiling: ceiling,
+                                                rejectReason: stopBroken
+                                                    ? 'next open through the stop'
+                                                    : 'next open above entry ceiling',
+                                            },
+                                        },
+                                    },
+                                },
+                            });
+                            continue;
+                        }
+
+                        entryPrice = fill;
+                        entryAtActual = new Date(entryBar.date);
+                    }
+
                     const maxHolding =
                         MAX_HOLDING_DAYS[signal.strategy] ??
                         DEFAULT_MAX_HOLDING_DAYS;
@@ -632,9 +768,24 @@ export async function updateSignalPerformance(): Promise<void> {
                     // Only candles inside the allowed holding window may
                     // trigger an exit. A stale signal must not inherit a
                     // stop/target hit that happened months later.
-                    const eligible = candles.filter(candle =>
-                        isWithinHoldingWindow(candle.date, entryAt, maxHolding)
-                    );
+                    const windowEnd = holdingWindowEnd(
+                        entryAtActual,
+                        maxHolding
+                    ).getTime();
+
+                    const eligible = isNextOpen
+                        ? candles.filter(
+                              (candle, index) =>
+                                  index >= entryBarIndex &&
+                                  new Date(candle.date).getTime() <= windowEnd
+                          )
+                        : candles.filter(candle =>
+                              isWithinHoldingWindow(
+                                  candle.date,
+                                  entryAt,
+                                  maxHolding
+                              )
+                          );
 
                     // If we have no split events but see a huge gap, do not
                     // turn a corporate action into a fake stop.
@@ -664,6 +815,16 @@ export async function updateSignalPerformance(): Promise<void> {
                         if (direction === 'SELL') {
                             if (
                                 adjusted.stopLoss != null &&
+                                candle.open >= adjusted.stopLoss
+                            ) {
+                                status = 'HIT_SL';
+                                exitPrice = candle.open;
+                                exitDate = new Date(candle.date);
+                                exitReason = 'STOP';
+                                break;
+                            }
+                            if (
+                                adjusted.stopLoss != null &&
                                 candle.high >= adjusted.stopLoss
                             ) {
                                 status = 'HIT_SL';
@@ -683,6 +844,16 @@ export async function updateSignalPerformance(): Promise<void> {
                                 break;
                             }
                         } else {
+                            if (
+                                adjusted.stopLoss != null &&
+                                candle.open <= adjusted.stopLoss
+                            ) {
+                                status = 'HIT_SL';
+                                exitPrice = candle.open;
+                                exitDate = new Date(candle.date);
+                                exitReason = 'STOP';
+                                break;
+                            }
                             if (
                                 adjusted.stopLoss != null &&
                                 candle.low <= adjusted.stopLoss
@@ -706,7 +877,10 @@ export async function updateSignalPerformance(): Promise<void> {
                         }
                     }
 
-                    const holdingDays = daysBetween(signal.date, now);
+                    const holdingDays = daysBetween(
+                        isNextOpen ? entryAtActual : signal.date,
+                        now
+                    );
                     const overdueDays = holdingDays - maxHolding;
 
                     if (status === 'OPEN' && holdingDays > maxHolding) {
@@ -719,7 +893,7 @@ export async function updateSignalPerformance(): Promise<void> {
                     const markPrice = exitPrice ?? lastClose;
                     const performance = computePerformance(
                         direction,
-                        adjusted.entry,
+                        entryPrice,
                         markPrice,
                         COST_MODEL
                     );
@@ -746,7 +920,24 @@ export async function updateSignalPerformance(): Promise<void> {
                                     performancePercent: performance.netPercent,
                                     grossPerformancePercent: performance.grossPercent,
                                     netPerformancePercent: performance.netPercent,
-                                    adjustedEntryPrice: adjusted.entry,
+                                    adjustedEntryPrice: entryPrice,
+                                    ...(isNextOpen
+                                        ? {
+                                              modelEntry: entryPrice,
+                                              entryRiskReward:
+                                                  adjusted.stopLoss != null
+                                                      ? Math.abs(
+                                                            (adjusted.target ??
+                                                                entryPrice) -
+                                                                entryPrice
+                                                        ) /
+                                                        Math.abs(
+                                                            entryPrice -
+                                                                adjusted.stopLoss
+                                                        )
+                                                      : undefined,
+                                          }
+                                        : {}),
                                     status,
                                     exitPrice,
                                     exitDate,

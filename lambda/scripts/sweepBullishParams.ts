@@ -14,6 +14,7 @@ import {
     backtestSeries,
     SymbolBacktest,
     summarise,
+    truncateAtDataGlitches,
 } from '../strategy/alignedBacktest';
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
@@ -83,7 +84,16 @@ async function main(): Promise<void> {
                     options.days,
                     '1d'
                 );
-                return { symbol, rows: calculateIndicators(candles) };
+                const cleaned = truncateAtDataGlitches(candles);
+                if (cleaned.droppedBars > 0) {
+                    console.log(
+                        `⚠️ ${symbol}: dropped ${cleaned.droppedBars} bars before ${cleaned.lastGlitch?.slice(
+                            0,
+                            10
+                        )} (price-scale jump)`
+                    );
+                }
+                return { symbol, rows: calculateIndicators(cleaned.rows) };
             } catch {
                 return { symbol, rows: [] };
             }

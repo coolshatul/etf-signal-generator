@@ -124,7 +124,9 @@ export type ExitReason =
     | 'REVERSAL'
     | 'DELISTED'
     | 'MIGRATION'
-    | 'MANUAL';
+    | 'MANUAL'
+    /** The next-session open breached the entry ceiling; no position taken. */
+    | 'ENTRY_INVALID';
 
 // Result for bullish stock analysis
 export interface BullishStockResult {
@@ -141,6 +143,8 @@ export interface BullishStockResult {
     swingLow: number;
     swingHigh: number;
     baseStopLevel: number;
+    /** Highest next-open price that keeps the trade valid. */
+    maxEntry?: number;
     marketRegimeBullish?: boolean;
     /** ISO timestamp of the candle the signal was computed from. */
     asOf?: string;

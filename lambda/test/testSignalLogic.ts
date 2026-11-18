@@ -6,6 +6,7 @@ import {
 } from '../utils/signalIdentity';
 import {
     validateTradeLevels,
+    maxValidEntry,
     DEFAULT_MIN_RISK_REWARD,
 } from '../utils/tradeLevels';
 import {
@@ -410,6 +411,10 @@ function testLiveRules() {
     assert.strictEqual(falling.isBullish, false);
     assert.strictEqual(falling.blockedBy, 'not up vs previous close');
 
+    // Entry ceiling: stop within 12% and reward at least 1:1.
+    assert.strictEqual(maxValidEntry(90, 105), 97.5);
+    assert.ok(maxValidEntry(90, 200) > 97.5);
+
     const levels = calculateBullishLevels(100, 95, 110, 97, 1);
     assert.strictEqual(levels.baseStopLevel, 97);
     assert.strictEqual(levels.stopLoss, 95.5);
@@ -552,7 +557,8 @@ function testAlignedBacktest() {
         'TESTWIN',
         risingSeries(140),
         'BULLISH_SCAN',
-        '1d'
+        '1d',
+        { entryModel: 'signal_close' }
     );
     assert.ok(winners.trades.length > 0, 'expected at least one trade');
     assert.strictEqual(winners.trades[0].exitReason, 'TARGET');
@@ -568,11 +574,70 @@ function testAlignedBacktest() {
         'TESTLOSS',
         risingSeries(140, 100),
         'BULLISH_SCAN',
-        '1d'
+        '1d',
+        { entryModel: 'signal_close' }
     );
     assert.strictEqual(losers.trades[0].exitReason, 'STOP');
     assert.ok(losers.trades[0].netPercent < 0);
-    assert.ok(losers.trades[0].netPercent > -4);
+    // The series gaps through the stop, so the fill is the open, not 146.5.
+    assert.ok(losers.trades[0].exitPrice! < 146.5);
+    assert.ok(losers.trades[0].netPercent > -5);
+
+    // Executable entries: fill at the next open and keep the absolute levels.
+    const executable = backtestSeries(
+        'TESTNEXT',
+        risingSeries(140),
+        'ETF_BULLISH_SCAN',
+        '1d',
+        { entryModel: 'next_open' }
+    );
+    assert.ok(executable.trades.length > 0, 'expected next-open trades');
+    assert.strictEqual(executable.trades[0].entryModel, 'next_open');
+    assert.ok(executable.trades[0].entry > 150, 'entry should be the next open');
+    assert.ok(executable.trades[0].entryRiskReward < 1.5);
+
+    // An open above the entry ceiling invalidates the trade.
+    const ceilingRows = risingSeries(140);
+    ceilingRows[101] = {
+        ...ceilingRows[101],
+        open: 152,
+        high: 152.5,
+        low: 151.5,
+        close: 152,
+    } as any;
+    const ceilingBlocked = backtestSeries(
+        'TESTCEIL',
+        ceilingRows,
+        'ETF_BULLISH_SCAN',
+        '1d',
+        { entryModel: 'next_open' }
+    );
+    const blockedDate = ceilingRows[101].date;
+    assert.ok(
+        !ceilingBlocked.trades.some(trade => trade.entryDate === blockedDate),
+        'the gapped entry must not be taken'
+    );
+
+    // A bar that opens beyond the stop must fill at the open, not the stop.
+    const gapRows = risingSeries(140);
+    const gapIdx = 102; // entry happened at bar 101's open
+    gapRows[gapIdx] = {
+        ...gapRows[gapIdx],
+        open: 140,
+        high: 140.5,
+        low: 139.5,
+        close: 140,
+    } as any;
+    const gapped = backtestSeries(
+        'TESTGAP',
+        gapRows,
+        'ETF_BULLISH_SCAN',
+        '1d',
+        { entryModel: 'next_open' }
+    );
+    assert.strictEqual(gapped.trades[0].exitReason, 'STOP');
+    assert.strictEqual(gapped.trades[0].exitPrice, 140);
+    assert.ok(gapped.trades[0].exitPrice < 146.5, 'fill must be below the stop');
 
     console.log('✅ aligned backtest OK');
 }

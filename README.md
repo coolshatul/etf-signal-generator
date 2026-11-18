@@ -52,7 +52,7 @@ A smart swing-trading strategy powered by momentum and trend indicators — perf
 
 The scanners only act on **completed candles**, never the currently-forming bar:
 
-- **Daily** scans run at 9:00 AM IST and 3:30 PM IST over the ETF universe, each using the last completed daily candle.
+- **Daily** scan runs once at 4:00 PM IST over the ETF universe, using the completed daily candle. The alert is a setup for the next session's open.
 - **Weekly** scans use the last completed week, so the number is stable Monday–Friday.
 - **Intraday** bars are only used after their full duration has elapsed.
 - Invalid/zero/null Yahoo rows are dropped, timestamps are deduped and sorted, and stale series are rejected. Stock candles without volume are discarded rather than treated as zero-volume bars.
@@ -67,7 +67,15 @@ The product is ETF-only.
   Rs 5 crore of median daily turnover. Target is 1.5R, stop is
   `max(swing low, EMA50) - 1.5 ATR` capped at 12%, holding window 45 days.
 - **Weekly pullback** (`WEEKLY_PULLBACK_WATCHLIST`) scans the same universe on
-  weekly candles. It is a research watchlist, not a trade.
+  weekly candles, once a week after Friday's close. It is a research
+  watchlist, not a trade.
+
+Signals are **executable**: the alert carries the signal close, the highest
+open that still satisfies the risk rules (the entry ceiling), and the
+stop/target levels. The tracker records the next session's open as the entry
+and measures performance from there. If that open breaches the ceiling, the
+trade is marked `ENTRY_INVALID` and excluded from trade statistics instead of
+being scored as if it had been filled.
 - **Intraday crossover was removed.** On liquid ETFs it produced a profit
   factor of 0.86 on 15-minute bars and 0.67 on daily bars, so it was not worth
   running.
@@ -96,6 +104,8 @@ A scored candidate is not a signal until its levels make sense:
 - Minimum reward:risk **1.5** (the ETF target sits exactly at 1.5R, so the
   check tolerates floating-point rounding).
 - Stop distance between **0.5%** and **12%** of entry.
+- Entry ceiling: the highest next open that keeps the stop within 12% and the
+  reward at least equal to the risk.
 - Rejected candidates are logged with a reason and never alerted.
 
 ### Costs and corporate actions

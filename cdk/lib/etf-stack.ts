@@ -61,16 +61,15 @@ export class EtfStack extends Stack {
             },
         });
 
-        // ⏰ Schedule the Lambda to run at 9:00 AM IST (pre-open retry using the
-        // previous close) and 4:00 PM IST (after the session closes, using
-        // today's final candle).
-        // 9:00 AM IST  = 3:30 AM UTC
-        // 4:00 PM IST  = 10:30 AM UTC
-        new events.Rule(this, 'HourlySignalSchedule', {
+        // ⏰ One scan per day, after the session has closed and the daily
+        // candle is final (16:00 IST = 10:30 UTC). The alert is a setup for
+        // the next session's open, so a second pre-open run would compete for
+        // the same dedupe slot with a stale candle.
+        new events.Rule(this, 'DailySignalSchedule', {
             schedule: events.Schedule.cron({
                 minute: '30',
-                hour: '3,10',
-                weekDay: 'MON-FRI', // Weekdays only
+                hour: '10',
+                weekDay: 'MON-FRI',
             }),
             targets: [new targets.LambdaFunction(dailySignalLambda)],
         });
@@ -115,12 +114,13 @@ export class EtfStack extends Stack {
             },
         });
 
-        // ⏰ Schedule the EMA36 Lambda to run once a day at 9:15 AM IST (3:45 AM UTC)
+        // ⏰ Weekly, after Friday's weekly candle is final.
+        // Saturday 09:30 IST = 04:00 UTC.
         new events.Rule(this, 'EMA36SignalSchedule', {
             schedule: events.Schedule.cron({
-                minute: '45',
-                hour: '3',
-                weekDay: 'MON-FRI', // Weekdays only
+                minute: '0',
+                hour: '4',
+                weekDay: 'SAT',
             }),
             targets: [new targets.LambdaFunction(ema36SignalLambda)],
         });

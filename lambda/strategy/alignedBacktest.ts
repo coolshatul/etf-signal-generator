@@ -39,8 +39,13 @@ export interface AlignedTrade {
     strategy: BacktestStrategy;
     timeframe: string;
     direction: 'BUY' | 'SELL';
+    /** Candle the signal was computed from. */
+    signalDate: string;
+    /** Candle/price at which the position is assumed to be opened. */
     entryDate: string;
+    entryModel: 'signal_close' | 'next_open';
     entry: number;
+    entryRiskReward: number;
     stopLoss: number;
     target: number;
     exitDate: string | null;
@@ -71,6 +76,17 @@ export interface BacktestOverrides {
     /** Restrict entries to an ISO date window (inclusive). */
     entryFrom?: string;
     entryTo?: string;
+    /**
+     * signal_close: enter at the signal candle's close (old model).
+     * next_open:    enter at the next session's open (executable model).
+     */
+    entryModel?: 'signal_close' | 'next_open';
+    /**
+     * Reward:risk floor applied at the executable entry. The 1.5 screen runs
+     * at signal time; after a gap the fill can be worse, so the floor here is
+     * lower. 1.0 means "reward must still exceed risk".
+     */
+    entryMinRiskReward?: number;
     /** Only take entries when the benchmark regime is bullish on that date. */
     requireBullishRegime?: boolean;
     /** Date (YYYY-MM-DD) -> benchmark is bullish. Supplied by the caller. */
@@ -111,6 +127,18 @@ export interface BacktestSummary {
     exits: Record<ExitReason, number>;
     avgWinPercent: number | null;
     avgLossPercent: number | null;
+    maxConsecutiveLosses: number;
+    /** Fills where the gap pushed reward:risk below the 1.5 screen. */
+    entryRrDegraded: number;
+    avgEntryRiskReward: number | null;
+    yearly: Array<{
+        year: number;
+        trades: number;
+        wins: number;
+        winRate: number | null;
+        avgNetPercent: number | null;
+        totalNetPercent: number | null;
+    }>;
     /** Equal-weight, compounding portfolio return across traded symbols. */
     portfolioReturnPercent: number | null;
     /** Peak-to-trough drawdown of that same equal-weight portfolio. */
@@ -118,6 +146,40 @@ export interface BacktestSummary {
 }
 
 const MAX_TRADES_PER_SYMBOL = 200;
+
+/**
+ * Yahoo occasionally returns a few bars at a different price scale (an
+ * unadjusted split, or a provider glitch). Indicators computed across that
+ * jump are meaningless and a position can appear to lose 90% in a day.
+ *
+ * Detect any close-to-close move beyond `thresholdPercent` and drop everything
+ * up to and including the last one, so the backtest only sees a consistent
+ * series. The caller must recompute indicators afterwards.
+ */
+export function truncateAtDataGlitches<T extends { date: string; close: number }>(
+    candles: T[],
+    thresholdPercent = 35
+): { rows: T[]; droppedBars: number; lastGlitch: string | null } {
+    let last = -1;
+
+    for (let i = 1; i < candles.length; i++) {
+        const previous = candles[i - 1]?.close;
+        const current = candles[i]?.close;
+        if (!previous || !current) continue;
+        const change = Math.abs((current - previous) / previous) * 100;
+        if (change > thresholdPercent) last = i;
+    }
+
+    if (last < 0) {
+        return { rows: candles, droppedBars: 0, lastGlitch: null };
+    }
+
+    return {
+        rows: candles.slice(last),
+        droppedBars: last,
+        lastGlitch: candles[last].date,
+    };
+}
 
 function dayDiff(from: string | Date, to: string | Date): number {
     const a = new Date(from).getTime();
@@ -276,25 +338,6 @@ export function backtestSeries(
                 }
             );
 
-            const validation = validateTradeLevels(
-                {
-                    direction: 'BUY',
-                    entry: bar.close,
-                    stopLoss: levels.stopLoss,
-                    target: levels.target,
-                },
-                riskLimits
-            );
-
-            if (!validation.valid) {
-                result.rejected++;
-                increment(
-                    result.rejections,
-                    bucketRejectionReason(validation.reason)
-                );
-                continue;
-            }
-
             direction = 'BUY';
             entry = bar.close;
             stopLoss = levels.stopLoss;
@@ -322,6 +365,49 @@ export function backtestSeries(
             target = evaluation.target!;
         }
 
+        // --- Entry execution model -------------------------------------
+        // signal_close is the old (optimistic) model: the alert price is the
+        // close of the signal candle. next_open is what a reader can actually
+        // pay: the open of the following session. Levels stay absolute; only
+        // the distances and reward:risk are recomputed against the fill.
+        const entryModel = overrides.entryModel ?? 'next_open';
+        let entryIndex = i;
+        let entryPrice = entry;
+
+        if (entryModel === 'next_open') {
+            if (i + 1 >= rows.length) continue;
+            entryIndex = i + 1;
+            entryPrice = rows[entryIndex].open;
+        }
+
+        const executable = validateTradeLevels(
+            { direction, entry: entryPrice, stopLoss, target },
+            {
+                ...riskLimits,
+                minRiskReward:
+                    overrides.entryMinRiskReward ?? 1.0,
+            }
+        );
+
+        if (!executable.valid) {
+            result.rejected++;
+            increment(
+                result.rejections,
+                entryModel === 'next_open'
+                    ? `entry invalid after gap (${bucketRejectionReason(
+                          executable.reason
+                      )})`
+                    : bucketRejectionReason(executable.reason)
+            );
+            continue;
+        }
+
+        entry = entryPrice;
+        const signalDate = bar.date;
+        const entryDate = rows[entryIndex].date;
+        const entryRiskReward =
+            Math.abs(target - entry) / Math.abs(entry - stopLoss);
+
         result.entries++;
 
         // Walk forward to the first bar that resolves the position.
@@ -330,11 +416,22 @@ export function backtestSeries(
         let exitReason: ExitReason = 'OPEN';
         let exitDate: string | null = null;
 
-        for (let j = i + 1; j < rows.length; j++) {
+        const scanStart = entryModel === 'next_open' ? entryIndex : i + 1;
+
+        for (let j = scanStart; j < rows.length; j++) {
             const candle = rows[j];
 
-            // Same ordering as the live tracker: stop first, then target.
+            // Stop first, then target. A bar that opens beyond the stop is
+            // filled at the open, not at the stop price, so a gap cannot be
+            // recorded as a clean stop-out.
             if (direction === 'BUY') {
+                if (candle.open <= stopLoss) {
+                    exitIndex = j;
+                    exitPrice = candle.open;
+                    exitReason = 'STOP';
+                    exitDate = candle.date;
+                    break;
+                }
                 if (candle.low <= stopLoss) {
                     exitIndex = j;
                     exitPrice = stopLoss;
@@ -350,6 +447,13 @@ export function backtestSeries(
                     break;
                 }
             } else {
+                if (candle.open >= stopLoss) {
+                    exitIndex = j;
+                    exitPrice = candle.open;
+                    exitReason = 'STOP';
+                    exitDate = candle.date;
+                    break;
+                }
                 if (candle.high >= stopLoss) {
                     exitIndex = j;
                     exitPrice = stopLoss;
@@ -368,7 +472,7 @@ export function backtestSeries(
 
             // The live tracker closes anything past its holding window at the
             // latest close, after checking that candle for a stop/target hit.
-            const elapsed = dayDiff(bar.date, candle.date);
+            const elapsed = dayDiff(entryDate, candle.date);
             if (elapsed > maxHolding) {
                 exitIndex = j;
                 exitPrice = candle.close;
@@ -402,15 +506,18 @@ export function backtestSeries(
             strategy,
             timeframe,
             direction,
-            entryDate: bar.date,
+            signalDate,
+            entryDate,
+            entryModel,
             entry,
+            entryRiskReward,
             stopLoss,
             target,
             exitDate,
             exitPrice,
             exitReason,
-            holdingDays: dayDiff(bar.date, exitDate ?? bar.date),
-            barsHeld: exitIndex - i,
+            holdingDays: dayDiff(entryDate, exitDate ?? entryDate),
+            barsHeld: exitIndex - entryIndex,
             grossPercent: performance.grossPercent,
             netPercent: performance.netPercent,
         });
@@ -503,6 +610,58 @@ export function summarise(
 
     const sortedByNet = [...closed].sort((a, b) => b.netPercent - a.netPercent);
 
+    const entryRr = closed
+        .map(trade => trade.entryRiskReward)
+        .filter(value => Number.isFinite(value));
+    const entryRrDegraded = entryRr.filter(value => value < 1.5).length;
+
+    let maxConsecutiveLosses = 0;
+    let currentLossStreak = 0;
+    for (const trade of closed) {
+        if (trade.netPercent <= 0) {
+            currentLossStreak++;
+            maxConsecutiveLosses = Math.max(
+                maxConsecutiveLosses,
+                currentLossStreak
+            );
+        } else {
+            currentLossStreak = 0;
+        }
+    }
+
+    const yearMap = new Map<
+        number,
+        { nets: number[]; wins: number }
+    >();
+    for (const trade of closed) {
+        const year = new Date(trade.exitDate ?? trade.entryDate).getUTCFullYear();
+        const bucket = yearMap.get(year) ?? { nets: [], wins: 0 };
+        bucket.nets.push(trade.netPercent);
+        if (trade.netPercent > 0) bucket.wins++;
+        yearMap.set(year, bucket);
+    }
+
+    const yearly = [...yearMap.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([year, bucket]) => ({
+            year,
+            trades: bucket.nets.length,
+            wins: bucket.wins,
+            winRate:
+                bucket.nets.length > 0
+                    ? (bucket.wins / bucket.nets.length) * 100
+                    : null,
+            avgNetPercent:
+                bucket.nets.length > 0
+                    ? bucket.nets.reduce((total, value) => total + value, 0) /
+                      bucket.nets.length
+                    : null,
+            totalNetPercent:
+                bucket.nets.length > 0
+                    ? bucket.nets.reduce((total, value) => total + value, 0)
+                    : null,
+        }));
+
     const dates = runs
         .flatMap(run => run.trades)
         .map(trade => new Date(trade.entryDate).getTime())
@@ -558,6 +717,12 @@ export function summarise(
         avgLossPercent: losses.length
             ? losses.reduce((total, value) => total + value, 0) / losses.length
             : null,
+        maxConsecutiveLosses,
+        entryRrDegraded,
+        avgEntryRiskReward: entryRr.length
+            ? entryRr.reduce((total, value) => total + value, 0) / entryRr.length
+            : null,
+        yearly,
         portfolioReturnPercent: tradedSymbols.length
             ? (portfolio - 1) * 100
             : null,
