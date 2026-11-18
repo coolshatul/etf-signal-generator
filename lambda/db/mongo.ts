@@ -209,10 +209,14 @@ export async function filterNewSignals<T extends { symbol: string; asOf?: string
 }
 
 /**
- * Logs bullish stock analysis results to MongoDB.
+ * Logs bullish scan results to MongoDB. The strategy must match the one used
+ * by the caller's dedupe pass, otherwise rows land under a different identity
+ * than the one that was just checked.
  */
 export async function logBullishSignals(
-    results: BullishStockResult[]
+    results: BullishStockResult[],
+    strategy: string = SIGNAL_STRATEGIES.etfBullish,
+    timeframe: SignalTimeframe = '1d'
 ): Promise<void> {
     if (!results.length) return;
 
@@ -222,8 +226,8 @@ export async function logBullishSignals(
         for (const result of results) {
             const entryAt = resolveEntryAt(result.asOf);
             const signalKey = buildSignalKey({
-                strategy: SIGNAL_STRATEGIES.bullish,
-                timeframe: '1d',
+                strategy,
+                timeframe,
                 symbol: result.symbol,
                 direction: 'BUY',
                 eventAt: entryAt,
@@ -234,7 +238,7 @@ export async function logBullishSignals(
                 symbol: result.symbol,
                 date: signalSessionDate(entryAt),
                 entryAt,
-                timeframe: '1d' as SignalTimeframe,
+                timeframe,
                 signal: 'BUY' as const,
                 price: result.price,
                 rating: result.rating,
@@ -242,7 +246,7 @@ export async function logBullishSignals(
                 stopLoss: result.stopLoss,
                 target: result.target,
                 riskRewardRatio: result.riskRewardRatio,
-                strategy: SIGNAL_STRATEGIES.bullish,
+                strategy,
                 status: 'OPEN' as const,
                 metadata: {
                     swingLow: result.swingLow,

@@ -31,6 +31,8 @@ export const COST_MODEL = {
 // Maximum number of calendar days a signal may stay open before it is closed
 // at the latest completed price.
 export const MAX_HOLDING_DAYS: Record<string, number> = {
+    // ETF scan uses a longer window; the stock scan is retained for history.
+    ETF_BULLISH_SCAN: 45,
     BULLISH_SCAN: 30,
     WEEKLY_PULLBACK_WATCHLIST: 10,
     EMA_CROSSOVER_SCAN: 15,
@@ -43,6 +45,7 @@ export const DEFAULT_MAX_HOLDING_DAYS = 30;
 // the exact same cross from re-alerting; the cooldown also prevents rapid
 // direction flip-flops.
 export const DEDUPE_COOLDOWN_MS: Record<string, number> = {
+    ETF_BULLISH_SCAN: 24 * 60 * 60 * 1000,
     BULLISH_SCAN: 24 * 60 * 60 * 1000,
     EMA_CROSSOVER_SCAN: 60 * 60 * 1000,
     WEEKLY_PULLBACK_WATCHLIST: 0,

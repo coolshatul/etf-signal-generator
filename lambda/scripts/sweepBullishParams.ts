@@ -26,6 +26,7 @@ interface Options {
     universe: 'nifty50' | 'etfs';
     drop: string[];
     windows: boolean;
+    regime: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -48,6 +49,7 @@ function parseArgs(argv: string[]): Options {
         universe,
         drop,
         windows: argv.includes('--windows'),
+        regime: argv.includes('--regime'),
     };
 }
 
@@ -288,6 +290,77 @@ async function main(): Promise<void> {
         }
 
         console.log(`\n  window: ${start.slice(0, 10)} to ${end.slice(0, 10)}, split at ${mid.slice(0, 10)}`);
+    }
+
+    // ---- Regime gate ----------------------------------------------------
+    if (options.regime) {
+        const best: BacktestOverrides = {
+            targetRMultiple: 1.5,
+            swingHighBuffer: 0,
+            maxHoldingDays: 45,
+            maxStopPercent: 12,
+        };
+
+        // The live regime rule is simply NIFTY close above its 50-day EMA.
+        const index = await fetchHistoricalData('^NSEI', options.days, '1d');
+        const indexRows = calculateIndicators(index);
+        const regimeByDate = new Map<string, boolean>();
+        for (const row of indexRows) {
+            if (row.ema50 == null) continue;
+            regimeByDate.set(row.date.slice(0, 10), row.close > row.ema50);
+        }
+
+        console.log('\nRegime gate (1.5R none 45d cap12%, NIFTY > EMA50):\n');
+        console.log('Variant                  Trades  Win%    AvgNet   PF    Portfolio  MaxDD');
+        console.log('─'.repeat(82));
+
+        // Same split points as --windows, computed from the loaded symbols.
+        const firsts = usable
+            .map(item => item.rows[0]?.date)
+            .filter(Boolean)
+            .sort();
+        const lasts = usable
+            .map(item => item.rows[item.rows.length - 1]?.date)
+            .filter(Boolean)
+            .sort();
+        const start = firsts[firsts.length - 1] ?? '1970-01-01';
+        const end = lasts[0] ?? '2100-01-01';
+        const mid = new Date(
+            (new Date(start).getTime() + new Date(end).getTime()) / 2
+        ).toISOString();
+
+        const windows = [
+            { label: 'full', from: undefined as string | undefined, to: undefined as string | undefined },
+            { label: 'first half', from: start, to: mid },
+            { label: 'second half', from: mid, to: end },
+        ];
+
+        for (const gated of [false, true]) {
+            for (const window of windows) {
+                const runs: SymbolBacktest[] = usable.map(item =>
+                    backtestSeries(item.symbol, item.rows, 'BULLISH_SCAN', '1d', {
+                        ...best,
+                        requireBullishRegime: gated,
+                        regimeByDate,
+                        entryFrom: window.from,
+                        entryTo: window.to,
+                    })
+                );
+                const summary = summarise(runs, 'BULLISH_SCAN', '1d');
+                console.log(
+                    `${`${gated ? 'regime bullish' : 'no gate'} · ${window.label}`.padEnd(
+                        24
+                    )} ${String(summary.trades).padStart(5)}  ${num(
+                        summary.winRate,
+                        1
+                    ).padStart(5)}  ${pct(summary.avgNetPercent).padStart(7)}  ${num(
+                        summary.profitFactor
+                    ).padStart(5)}  ${pct(summary.portfolioReturnPercent).padStart(
+                        9
+                    )}  ${pct(summary.maxDrawdownPercent).padStart(7)}`
+                );
+            }
+        }
     }
 
     // Buy & hold over the same window, for context.

@@ -413,8 +413,41 @@ function testLiveRules() {
     const levels = calculateBullishLevels(100, 95, 110, 97, 1);
     assert.strictEqual(levels.baseStopLevel, 97);
     assert.strictEqual(levels.stopLoss, 95.5);
-    assert.strictEqual(levels.target, 115.5);
-    assert.ok(levels.riskRewardRatio > 3);
+    // Live default is a 1.5R target with no swing-high floor.
+    assert.strictEqual(levels.target, 106.75);
+    assert.ok(Math.abs(levels.riskRewardRatio - 1.5) < 1e-12);
+
+    // A target that is exactly 1.5R must pass the 1.5 guard even when float
+    // division lands a hair below the boundary. Scan a range of prices so the
+    // test actually hits representation error rather than one hand-picked case.
+    let boundaryCases = 0;
+    for (let i = 1; i < 400; i++) {
+        const entry = 100 + i * 0.37;
+        const stopPercent = 0.6 + (i % 200) * 0.05;
+        const stop = entry * (1 - stopPercent / 100);
+        const risk = entry - stop;
+        const target = entry + risk * 1.5;
+        const ratio = (target - entry) / risk;
+
+        if (ratio < 1.5) boundaryCases++;
+
+        const validation = validateTradeLevels(
+            { direction: 'BUY', entry, stopLoss: stop, target },
+            { minRiskReward: 1.5, minStopPercent: 0.5, maxStopPercent: 50 }
+        );
+        assert.strictEqual(
+            validation.valid,
+            true,
+            `exact 1.5R rejected at entry ${entry}: ${validation.reason}`
+        );
+    }
+    assert.ok(boundaryCases > 0, 'expected at least one float boundary case');
+
+    // The swing-high floor is still available for sweep comparisons.
+    const floored = calculateBullishLevels(100, 95, 110, 97, 1, {
+        swingHighBuffer: 1.05,
+    });
+    assert.strictEqual(floored.target, 115.5);
 
     console.log('✅ live entry rules OK');
 }
@@ -523,8 +556,8 @@ function testAlignedBacktest() {
     );
     assert.ok(winners.trades.length > 0, 'expected at least one trade');
     assert.strictEqual(winners.trades[0].exitReason, 'TARGET');
-    assert.ok(winners.trades[0].netPercent > 4);
-    assert.ok(winners.trades[0].netPercent < 6);
+    assert.ok(winners.trades[0].netPercent > 2.5);
+    assert.ok(winners.trades[0].netPercent < 3.5);
 
     const summary = summarise([winners], 'BULLISH_SCAN', '1d');
     assert.ok(summary.trades >= 1);

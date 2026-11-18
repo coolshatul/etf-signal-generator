@@ -9,6 +9,9 @@ import { SignalDirection, SignalTimeframe } from '../types';
 import { startOfIstDay } from './marketTime';
 
 export const SIGNAL_STRATEGIES = {
+    // Live scans now run on the ETF universe. BULLISH_SCAN is kept so the
+    // historical stock signals keep their own identity and statistics.
+    etfBullish: 'ETF_BULLISH_SCAN',
     bullish: 'BULLISH_SCAN',
     weeklyPullback: 'WEEKLY_PULLBACK_WATCHLIST',
     emaCrossover: 'EMA_CROSSOVER_SCAN',

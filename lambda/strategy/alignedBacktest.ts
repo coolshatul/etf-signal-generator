@@ -28,7 +28,10 @@ import {
     evaluateCrossoverAt,
 } from './liveRules';
 
-export type BacktestStrategy = 'BULLISH_SCAN' | 'EMA_CROSSOVER_SCAN';
+export type BacktestStrategy =
+    | 'ETF_BULLISH_SCAN'
+    | 'BULLISH_SCAN'
+    | 'EMA_CROSSOVER_SCAN';
 export type ExitReason = 'STOP' | 'TARGET' | 'MAX_HOLDING' | 'OPEN';
 
 export interface AlignedTrade {
@@ -68,6 +71,10 @@ export interface BacktestOverrides {
     /** Restrict entries to an ISO date window (inclusive). */
     entryFrom?: string;
     entryTo?: string;
+    /** Only take entries when the benchmark regime is bullish on that date. */
+    requireBullishRegime?: boolean;
+    /** Date (YYYY-MM-DD) -> benchmark is bullish. Supplied by the caller. */
+    regimeByDate?: Map<string, boolean>;
 }
 
 export interface SymbolBacktest {
@@ -174,7 +181,7 @@ export function backtestSeries(
     };
 
     const warmup =
-        strategy === 'BULLISH_SCAN'
+        strategy === 'BULLISH_SCAN' || strategy === 'ETF_BULLISH_SCAN'
             ? BULLISH_RULES.MIN_DATA_POINTS
             : CROSSOVER_RULES.MIN_DATA_POINTS;
 
@@ -200,12 +207,17 @@ export function backtestSeries(
 
         if (overrides.entryFrom && bar.date < overrides.entryFrom) continue;
         if (overrides.entryTo && bar.date > overrides.entryTo) continue;
+
+        if (overrides.requireBullishRegime) {
+            const dayKey = bar.date.slice(0, 10);
+            if (overrides.regimeByDate?.get(dayKey) !== true) continue;
+        }
         let direction: 'BUY' | 'SELL' | null = null;
         let entry = 0;
         let stopLoss = 0;
         let target = 0;
 
-        if (strategy === 'BULLISH_SCAN') {
+        if (strategy === 'BULLISH_SCAN' || strategy === 'ETF_BULLISH_SCAN') {
             const prev = rows[i - 1];
             const prevPrev = rows[i - 2];
             if (!prev || !prevPrev) continue;

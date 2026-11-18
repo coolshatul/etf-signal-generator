@@ -21,12 +21,13 @@ import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { CandleWithIndicators } from '../types';
 import {
+    etfSymbols,
     nifty50Symbols,
     niftyNext50Symbols,
     processWithConcurrency,
 } from '../utils/common';
 
-type Universe = 'nifty50' | 'both';
+type Universe = 'nifty50' | 'both' | 'etfs';
 
 interface Options {
     strategy: BacktestStrategy;
@@ -49,14 +50,23 @@ function parseArgs(argv: string[]): Options {
     const strategy: BacktestStrategy =
         strategyArg === 'crossover' || strategyArg === 'ema_crossover'
             ? 'EMA_CROSSOVER_SCAN'
-            : 'BULLISH_SCAN';
+            : strategyArg === 'legacy-bullish'
+              ? 'BULLISH_SCAN'
+              : 'ETF_BULLISH_SCAN';
 
-    const defaultTimeframe = strategy === 'BULLISH_SCAN' ? '1d' : '15m';
+    const defaultTimeframe =
+        strategy === 'EMA_CROSSOVER_SCAN' ? '15m' : '1d';
     const timeframe = (get('timeframe') ?? defaultTimeframe) as Options['timeframe'];
 
     const days = Number(get('days') ?? (timeframe === '1d' ? 730 : 60));
     const limit = Number(get('limit') ?? 50);
-    const universe = (get('universe') ?? 'nifty50') as Universe;
+    const universeArg = (get('universe') ?? 'nifty50').toLowerCase();
+    const universe: Universe =
+        universeArg === 'etfs' || universeArg === 'etf'
+            ? 'etfs'
+            : universeArg === 'both'
+              ? 'both'
+              : 'nifty50';
     const concurrency = Number(get('concurrency') ?? 5);
 
     return {
@@ -64,7 +74,7 @@ function parseArgs(argv: string[]): Options {
         timeframe,
         days: Number.isFinite(days) && days > 0 ? days : 730,
         limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
-        universe: universe === 'both' ? 'both' : 'nifty50',
+        universe,
         legacy: argv.includes('--legacy'),
         concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : 5,
     };
@@ -173,9 +183,11 @@ function printSummary(
 async function main(): Promise<void> {
     const options = parseArgs(process.argv.slice(2));
     const universe =
-        options.universe === 'both'
-            ? [...nifty50Symbols, ...niftyNext50Symbols]
-            : nifty50Symbols;
+        options.universe === 'etfs'
+            ? etfSymbols
+            : options.universe === 'both'
+              ? [...nifty50Symbols, ...niftyNext50Symbols]
+              : nifty50Symbols;
     const symbols = universe.slice(0, options.limit);
 
     console.log(

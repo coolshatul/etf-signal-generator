@@ -353,7 +353,7 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
         const html = renderEmailShell({
             title: 'No Bullish Signals Today',
             accent: '#475569',
-            preheader: 'No Nifty 50 stocks met the bullish criteria today.',
+            preheader: 'No ETFs met the bullish criteria today.',
             intro:
                 'The daily scan completed and found no executable bullish setups. Nothing needs your attention today.',
             stats: [{ label: 'Signals', value: '0' }],
@@ -375,7 +375,7 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
     const rows = display.map(stock => {
         const risk = Math.abs(stock.stopLossPercent || 0);
         const reward = Math.abs(stock.targetPercent || 0);
-        const detail = `Rating ${stock.rating}/8${
+        const detail = `Rating ${stock.rating}/10${
             stock.signals.length ? ` · ${stock.signals.slice(0, 2).join(' · ')}` : ''
         }`;
 
@@ -406,8 +406,8 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
             bullishResults.length === 1 ? '' : 's'
         }`,
         accent: '#166534',
-        preheader: `${bullishResults.length} Nifty 50 stocks passed the bullish screen with defined stop and target levels.`,
-        intro: `The daily scan found ${bullishResults.length} stock${
+        preheader: `${bullishResults.length} ETFs passed the bullish screen with defined stop and target levels.`,
+        intro: `The daily scan found ${bullishResults.length} ETF${
             bullishResults.length === 1 ? '' : 's'
         } with a valid bullish structure. Every setup below has a defined stop, target and at least a 1.5:1 reward-to-risk ratio.`,
         stats: [
@@ -421,7 +421,7 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
             }
         ],
         table: renderSignalTable(
-            ['Stock', 'Action', 'Entry / Stop / Target', 'Risk : Reward', ''],
+            ['ETF', 'Action', 'Entry / Stop / Target', 'Risk : Reward', ''],
             rows
         ),
         explainerTitle: 'How to use this email',
@@ -438,12 +438,12 @@ export async function sendBullishStocksEmail(bullishResults: BullishStockResult[
     });
 
     await sendEmailWithRetry(
-        `NSE Swing Signals — ${bullishResults.length} BUY setup${
+        `NSE ETF Signals — ${bullishResults.length} BUY setup${
             bullishResults.length === 1 ? '' : 's'
         } (${getCurrentDate()})`,
         html
     );
-    console.log(`📧 Email alert sent for ${bullishResults.length} bullish stocks`);
+    console.log(`📧 Email alert sent for ${bullishResults.length} bullish ETFs`);
 }
 
 export async function sendEMA36Email(ema36Results: EMA36Result[]): Promise<void> {
@@ -633,7 +633,7 @@ export async function sendEMACrossoverEmail(emaCrossoverResults: EMACrossoverRes
             { label: 'Avg R : R', value: averageRr ? `${averageRr.toFixed(1)} : 1` : '—' }
         ],
         table: renderSignalTable(
-            ['Stock', 'Action', 'Entry / Stop / Target', 'Risk : Reward', ''],
+            ['ETF', 'Action', 'Entry / Stop / Target', 'Risk : Reward', ''],
             rows
         ),
         explainerTitle: 'How to read the crossover signals',
@@ -657,7 +657,8 @@ export async function sendEMACrossoverEmail(emaCrossoverResults: EMACrossoverRes
 }
 
 const STRATEGY_LABELS: Record<string, string> = {
-    BULLISH_SCAN: 'Bullish swing',
+    ETF_BULLISH_SCAN: 'ETF bullish swing',
+    BULLISH_SCAN: 'Bullish swing (stocks)',
     EMA_CROSSOVER_SCAN: 'EMA crossover',
     BULLISH_SCAN_ALERT: 'Legacy bullish',
     WEEKLY_PULLBACK_WATCHLIST: 'Weekly watchlist'

@@ -1,7 +1,7 @@
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { BullishStockResult } from '../types';
-import { nifty50Symbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
+import { etfSymbols, processWithConcurrency, LOOKBACK_DAYS } from '../utils/common';
 import { validateTradeLevels } from '../utils/tradeLevels';
 import { RISK_LIMITS } from '../config/settings';
 import {
@@ -29,8 +29,8 @@ function getDefaultResponse(symbol: string): BullishStockResult {
     };
 }
 
-// Analyze a single stock for bullish signals
-async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> {
+// Analyze a single ETF for bullish signals
+async function analyzeBullishEtf(symbol: string): Promise<BullishStockResult> {
     try {
         // Fetch historical data with a standardised lookback
         const rawData = await fetchHistoricalData(symbol, LOOKBACK_DAYS.daily);
@@ -132,20 +132,20 @@ async function analyzeBullishStock(symbol: string): Promise<BullishStockResult> 
 import { getMarketRegime } from './marketRegime';
 
 /**
- * Analyzes Nifty50 stocks for bullish signals based on EMA strategy.
- * @returns {Promise<BullishStockResult[]>} Array of bullish stock results
+ * Analyzes the ETF universe for bullish signals based on EMA strategy.
+ * @returns {Promise<BullishStockResult[]>} Array of bullish results
  */
-export async function analyzeNifty50Bullish(): Promise<BullishStockResult[]> {
-    console.log('📊 Analyzing Nifty50 stocks for bullish signals...');
+export async function analyzeEtfBullish(): Promise<BullishStockResult[]> {
+    console.log('📊 Analyzing ETFs for bullish signals...');
 
     // Get overall market regime first
     const marketRegime = await getMarketRegime();
     console.log(`🌍 Market Regime: ${marketRegime.isBullish ? 'BULLISH' : 'BEARISH'} (${marketRegime.trend})`);
 
     // Analyze each stock with concurrency control to avoid rate limits
-    const results = await processWithConcurrency(nifty50Symbols, analyzeBullishStock);
+    const results = await processWithConcurrency(etfSymbols, analyzeBullishEtf);
 
-    // Filter to bullish stocks only
+    // Filter to bullish ETFs only
     let bullishResults = results.filter(r => r.isBullish);
 
     // Surface rejected candidates so weak levels are visible in logs.
@@ -168,7 +168,7 @@ export async function analyzeNifty50Bullish(): Promise<BullishStockResult[]> {
         marketRegimeBullish: marketRegime.isBullish
     }));
 
-    console.log(`✅ Found ${bullishResults.length} bullish stocks out of ${nifty50Symbols.length}`);
+    console.log(`✅ Found ${bullishResults.length} bullish ETFs out of ${etfSymbols.length}`);
 
     return bullishResults;
 }

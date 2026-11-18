@@ -117,7 +117,7 @@ export function validateTradeLevels(
         };
     }
 
-    if (riskRewardRatio < minRiskReward) {
+    if (riskRewardRatio < minRiskReward - 1e-9) {
         return {
             valid: false,
             reason: `reward:risk ${riskRewardRatio.toFixed(2)} is below the ${minRiskReward} minimum`,

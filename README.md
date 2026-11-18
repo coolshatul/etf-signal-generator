@@ -52,12 +52,20 @@ A smart swing-trading strategy powered by momentum and trend indicators — perf
 
 The scanners only act on **completed candles**, never the currently-forming bar:
 
-- **Daily** scans run at 9:00 AM IST (previous close) and 4:00 PM IST (today's final candle).
+- **Daily** scans run at 9:00 AM IST (previous close) and 4:00 PM IST (today's final candle) over the ETF universe.
 - **Weekly** scans use the last completed week, so the number is stable Monday–Friday.
 - **Intraday** bars are only used after their full duration has elapsed.
 - Invalid/zero/null Yahoo rows are dropped, timestamps are deduped and sorted, and stale series are rejected. Stock candles without volume are discarded rather than treated as zero-volume bars.
 - Alerts fire only on **new** signals. A position that is already open is not re-alerted every run.
 - Performance tracking checks intrabar **high/low** (not just the close), handles long and short signals, and closes stale signals after a per-strategy holding period.
+
+### Universe
+
+The daily bullish scan runs on 33 liquid NSE ETFs (`ETF_BULLISH_SCAN`), with a
+1.5R ATR target, a stop of `max(swing low, EMA50) - 1.5 ATR` capped at 12%, and
+a 45-day holding window. The older Nifty50 stock scan is retained as
+`BULLISH_SCAN` so its historical signals keep their own statistics; it no
+longer runs on a schedule.
 
 ### Signal identity and dedupe
 
@@ -70,14 +78,15 @@ signalKey = strategy | timeframe | symbol | direction | eventAt
 - The same candle (or the same EMA cross bar) can never alert twice, even after it is stopped out or hits target.
 - Same-day BUY and SELL signals can coexist, and a crossover in the opposite direction closes the open position as `REVERSAL`.
 - If the dedupe lookup cannot reach MongoDB, alerts are **suppressed** rather than risk duplicates.
-- Cooldowns: bullish daily 1 day, crossover 60 minutes, watchlist none.
+- Cooldowns: ETF bullish daily 1 day, crossover 60 minutes, watchlist none.
 
 ### Trade validation
 
 A scored candidate is not a signal until its levels make sense:
 
 - BUY: `stop < entry < target`; SELL: `target < entry < stop`.
-- Minimum reward:risk **1.5**.
+- Minimum reward:risk **1.5** (the ETF target sits exactly at 1.5R, so the
+  check tolerates floating-point rounding).
 - Stop distance between **0.5%** and **12%** of entry.
 - Rejected candidates are logged with a reason and never alerted.
 
@@ -164,8 +173,11 @@ Telegram remains available but is off unless `TELEGRAM_ALERTS_ENABLED=true`.
 backtest both import it, so the backtest cannot drift from what is traded.
 
 ```bash
-# Bullish daily scans over two years, with the old engine for comparison
-npm run backtest-aligned -- --strategy=bullish --days=730 --limit=50 --legacy
+# ETF bullish scans over two years, with the old engine for comparison
+npm run backtest-aligned -- --strategy=bullish --universe=etfs --days=730 --legacy
+
+# Parameter sweep and robustness checks
+npm run sweep-bullish -- --universe=etfs --windows --regime
 
 # EMA crossover on 15-minute bars (Yahoo keeps ~60 days of intraday data)
 npm run backtest-aligned -- --strategy=crossover --timeframe=15m --days=60

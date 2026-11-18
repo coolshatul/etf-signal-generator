@@ -1,4 +1,4 @@
-import { analyzeNifty50Bullish } from '../services/analyzeNifty50Bullish';
+import { analyzeEtfBullish } from '../services/analyzeEtfBullish';
 import { sendBullishStocksAlert } from '../alerts/telegram';
 import { sendBullishStocksEmail } from '../alerts/email';
 import { logBullishSignals, filterNewSignals } from '../db/mongo';
@@ -10,20 +10,20 @@ import {
     resolveEntryAt,
 } from '../utils/signalIdentity';
 
-const STRATEGY = SIGNAL_STRATEGIES.bullish;
+const STRATEGY = SIGNAL_STRATEGIES.etfBullish;
 const TIMEFRAME = '1d' as const;
 
 export const handler = async (): Promise<void> => {
-    console.log('📡 Starting daily Nifty50 bullish stocks scan...');
+    console.log('📡 Starting daily ETF bullish scan...');
 
     // Check if today is an NSE holiday
     if (isTodayHoliday()) {
-        console.log('🏖️ Today is an NSE holiday. Skipping bullish stocks analysis.');
+        console.log('🏖️ Today is an NSE holiday. Skipping ETF bullish analysis.');
         return;
     }
 
     try {
-        const bullishResults = await analyzeNifty50Bullish();
+        const bullishResults = await analyzeEtfBullish();
 
         // Only alert on positions that are not already open and whose exact
         // signal event has not been seen before.
@@ -67,14 +67,14 @@ export const handler = async (): Promise<void> => {
         }
 
         // Log to DB
-        await logBullishSignals(newSignals);
+        await logBullishSignals(newSignals, STRATEGY, TIMEFRAME);
 
         console.log(
-            `✅ Completed bullish stocks analysis. Found ${newSignals.length} new bullish stocks.`
+            `✅ Completed ETF bullish analysis. Found ${newSignals.length} new signals.`
         );
     } catch (err) {
-        console.error('❌ Error analyzing Nifty50 stocks:', err);
+        console.error('❌ Error analyzing ETFs:', err);
     }
 
-    console.log('🎯 Nifty50 bullish stocks analysis completed.');
+    console.log('🎯 ETF bullish analysis completed.');
 };

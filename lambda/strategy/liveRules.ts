@@ -21,9 +21,10 @@ export const BULLISH_RULES = {
     RSI_MIN: 40,
     RSI_MAX: 60,
     BULLISH_THRESHOLD: 5,
-    /** Target is the larger of 2R or swing-high + 5%. */
-    TARGET_R_MULTIPLE: 2,
-    SWING_HIGH_BUFFER: 1.05,
+    /** Target is R multiple of risk. */
+    TARGET_R_MULTIPLE: 1.5,
+    /** 0 disables the swing-high floor; kept as a sweep parameter. */
+    SWING_HIGH_BUFFER: 0,
 } as const;
 
 export const CROSSOVER_RULES = {
