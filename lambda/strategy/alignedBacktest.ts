@@ -65,6 +65,9 @@ export interface BacktestOverrides {
     bullishRsiMax?: number;
     /** Skip entries when ADX is below this value. */
     minAdx?: number;
+    /** Restrict entries to an ISO date window (inclusive). */
+    entryFrom?: string;
+    entryTo?: string;
 }
 
 export interface SymbolBacktest {
@@ -194,6 +197,9 @@ export function backtestSeries(
         if (i <= busyUntil) continue;
 
         const bar = rows[i];
+
+        if (overrides.entryFrom && bar.date < overrides.entryFrom) continue;
+        if (overrides.entryTo && bar.date > overrides.entryTo) continue;
         let direction: 'BUY' | 'SELL' | null = null;
         let entry = 0;
         let stopLoss = 0;

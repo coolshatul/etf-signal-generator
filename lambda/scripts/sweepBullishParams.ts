@@ -18,11 +18,14 @@ import {
 import { fetchHistoricalData } from '../utils/fetchData';
 import { calculateIndicators } from '../utils/indicators';
 import { CandleWithIndicators } from '../types';
-import { nifty50Symbols, processWithConcurrency } from '../utils/common';
+import { etfSymbols, nifty50Symbols, processWithConcurrency } from '../utils/common';
 
 interface Options {
     days: number;
     limit: number;
+    universe: 'nifty50' | 'etfs';
+    drop: string[];
+    windows: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -33,9 +36,18 @@ function parseArgs(argv: string[]): Options {
     };
     const days = Number(get('days') ?? 730);
     const limit = Number(get('limit') ?? 50);
+    const universe = (get('universe') ?? 'nifty50') === 'etfs' ? 'etfs' : 'nifty50';
+    const drop = (get('drop') ?? '')
+        .split(',')
+        .map(value => value.trim().toUpperCase())
+        .filter(Boolean);
+
     return {
         days: Number.isFinite(days) && days > 0 ? days : 730,
         limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
+        universe,
+        drop,
+        windows: argv.includes('--windows'),
     };
 }
 
@@ -51,10 +63,13 @@ function num(value: number | null, digits = 2): string {
 
 async function main(): Promise<void> {
     const options = parseArgs(process.argv.slice(2));
-    const symbols = nifty50Symbols.slice(0, options.limit);
+    const universe = options.universe === 'etfs' ? etfSymbols : nifty50Symbols;
+    const symbols = universe
+        .filter(symbol => !options.drop.includes(symbol))
+        .slice(0, options.limit);
 
     console.log(
-        `🔄 Loading ${symbols.length} symbols (${options.days} days of daily candles)...`
+        `🔄 Loading ${symbols.length} ${options.universe} symbols (${options.days} days of daily candles)...`
     );
 
     const loaded = await processWithConcurrency(
@@ -215,6 +230,64 @@ async function main(): Promise<void> {
                 9
             )}  ${pct(summary.maxDrawdownPercent).padStart(7)}`
         );
+    }
+
+    // ---- Robustness: time split -----------------------------------------
+    if (options.windows) {
+        const best: BacktestOverrides = {
+            targetRMultiple: 1.5,
+            swingHighBuffer: 0,
+            maxHoldingDays: 45,
+            maxStopPercent: 12,
+        };
+
+        const firsts = usable
+            .map(item => item.rows[0]?.date)
+            .filter(Boolean)
+            .sort();
+        const lasts = usable
+            .map(item => item.rows[item.rows.length - 1]?.date)
+            .filter(Boolean)
+            .sort();
+
+        const start = firsts[firsts.length - 1] ?? '1970-01-01';
+        const end = lasts[0] ?? '2100-01-01';
+        const mid = new Date(
+            (new Date(start).getTime() + new Date(end).getTime()) / 2
+        ).toISOString();
+
+        const windows = [
+            { label: 'full period', from: undefined, to: undefined },
+            { label: 'first half', from: start, to: mid },
+            { label: 'second half', from: mid, to: end },
+        ];
+
+        console.log('\nRobustness (1.5R none 45d cap12%):\n');
+        console.log('Window           Trades  Win%    AvgNet   PF    Portfolio  MaxDD');
+        console.log('─'.repeat(74));
+
+        for (const window of windows) {
+            const runs: SymbolBacktest[] = usable.map(item =>
+                backtestSeries(item.symbol, item.rows, 'BULLISH_SCAN', '1d', {
+                    ...best,
+                    entryFrom: window.from,
+                    entryTo: window.to,
+                })
+            );
+            const summary = summarise(runs, 'BULLISH_SCAN', '1d');
+            console.log(
+                `${window.label.padEnd(16)} ${String(summary.trades).padStart(5)}  ${num(
+                    summary.winRate,
+                    1
+                ).padStart(5)}  ${pct(summary.avgNetPercent).padStart(7)}  ${num(
+                    summary.profitFactor
+                ).padStart(5)}  ${pct(summary.portfolioReturnPercent).padStart(
+                    9
+                )}  ${pct(summary.maxDrawdownPercent).padStart(7)}`
+            );
+        }
+
+        console.log(`\n  window: ${start.slice(0, 10)} to ${end.slice(0, 10)}, split at ${mid.slice(0, 10)}`);
     }
 
     // Buy & hold over the same window, for context.

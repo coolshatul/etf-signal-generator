@@ -18,6 +18,18 @@ export const niftyNext50Symbols = [
     'PFC', 'NAUKRI', 'BOSCHLTD', 'LICI', 'CGPOWER', 'IOC', 'ABB', 'SHREECEM', 'BPCL', 'GAIL'
 ];
 
+// Liquid NSE ETFs with usable Yahoo history. Excludes money-market funds
+// (LIQUIDBEES) because they are not swing instruments.
+export const etfSymbols = [
+    'NIFTYBEES', 'JUNIORBEES', 'BANKBEES', 'ITBEES', 'GOLDBEES',
+    'SILVERBEES', 'CPSEETF', 'INFRABEES', 'PSUBNKBEES', 'MON100',
+    'MAFANG', 'MOM100', 'HDFCNIFTY', 'NIFTYETF', 'HDFCMID150',
+    'ICICIB22', 'ABSLNN50ET', 'TNIDETF', 'NETF', 'VAL30IETF',
+    'ALPHA', 'LOWVOL1', 'NV20', 'QUAL30IETF', 'SENSEXETF',
+    'HDFCSML250', 'MIDCAPETF', 'CONSUMBEES', 'AUTOBEES', 'PHARMABEES',
+    'FMCGIETF', 'PSUBNKIETF', 'BSE500IETF',
+];
+
 // Configuration constants
 export const API_CONFIG = {
     DELAY_MS: 100,  // Delay between API calls to avoid rate limits
