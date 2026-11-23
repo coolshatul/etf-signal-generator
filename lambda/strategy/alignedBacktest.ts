@@ -87,6 +87,8 @@ export interface BacktestOverrides {
      * lower. 1.0 means "reward must still exceed risk".
      */
     entryMinRiskReward?: number;
+    /** Calendar days to wait after an exit before re-entering the symbol. */
+    reentryCooldownDays?: number;
     /** Only take entries when the benchmark regime is bullish on that date. */
     requireBullishRegime?: boolean;
     /** Date (YYYY-MM-DD) -> benchmark is bullish. Supplied by the caller. */
@@ -99,6 +101,7 @@ export interface SymbolBacktest {
     entries: number;
     rejected: number;
     rejections: Record<string, number>;
+    skippedCooldown: number;
 }
 
 export interface BacktestSummary {
@@ -130,6 +133,8 @@ export interface BacktestSummary {
     maxConsecutiveLosses: number;
     /** Fills where the gap pushed reward:risk below the 1.5 screen. */
     entryRrDegraded: number;
+    /** Entries skipped because the symbol was still in its post-exit cooldown. */
+    skippedCooldown: number;
     avgEntryRiskReward: number | null;
     yearly: Array<{
         year: number;
@@ -240,6 +245,7 @@ export function backtestSeries(
         entries: 0,
         rejected: 0,
         rejections: {},
+        skippedCooldown: 0,
     };
 
     const warmup =
@@ -261,6 +267,8 @@ export function backtestSeries(
 
     // Index of the bar the current position is still occupying.
     let busyUntil = -1;
+    let lastExitAt: Date | null = null;
+    let skippedCooldown = 0;
 
     for (let i = warmup; i < rows.length - 1; i++) {
         if (i <= busyUntil) continue;
@@ -268,6 +276,16 @@ export function backtestSeries(
         const bar = rows[i];
 
         if (overrides.entryFrom && bar.date < overrides.entryFrom) continue;
+
+        if (overrides.reentryCooldownDays && lastExitAt) {
+            const sinceExit =
+                (new Date(bar.date).getTime() - lastExitAt.getTime()) /
+                86400000;
+            if (sinceExit < overrides.reentryCooldownDays) {
+                skippedCooldown++;
+                continue;
+            }
+        }
         if (overrides.entryTo && bar.date > overrides.entryTo) continue;
 
         if (overrides.requireBullishRegime) {
@@ -385,7 +403,8 @@ export function backtestSeries(
             {
                 ...riskLimits,
                 minRiskReward:
-                    overrides.entryMinRiskReward ?? 1.0,
+                    overrides.entryMinRiskReward ??
+                    RISK_LIMITS.entryMinRiskReward,
             }
         );
 
@@ -494,6 +513,10 @@ export function backtestSeries(
             busyUntil = exitIndex;
         }
 
+        if (exitReason !== 'OPEN') {
+            lastExitAt = new Date(exitDate ?? rows[exitIndex].date);
+        }
+
         const performance = computePerformance(
             direction,
             entry,
@@ -525,6 +548,7 @@ export function backtestSeries(
         if (result.trades.length >= MAX_TRADES_PER_SYMBOL) break;
     }
 
+    result.skippedCooldown = skippedCooldown;
     return result;
 }
 
@@ -614,6 +638,9 @@ export function summarise(
         .map(trade => trade.entryRiskReward)
         .filter(value => Number.isFinite(value));
     const entryRrDegraded = entryRr.filter(value => value < 1.5).length;
+
+    let skippedCooldown = 0;
+    for (const run of runs) skippedCooldown += run.skippedCooldown;
 
     let maxConsecutiveLosses = 0;
     let currentLossStreak = 0;
@@ -719,6 +746,7 @@ export function summarise(
             : null,
         maxConsecutiveLosses,
         entryRrDegraded,
+        skippedCooldown,
         avgEntryRiskReward: entryRr.length
             ? entryRr.reduce((total, value) => total + value, 0) / entryRr.length
             : null,

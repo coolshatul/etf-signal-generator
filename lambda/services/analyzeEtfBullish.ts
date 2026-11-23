@@ -77,7 +77,8 @@ async function analyzeBullishEtf(symbol: string): Promise<BullishStockResult> {
         const maxEntry = maxValidEntry(
             levels.stopLoss,
             levels.target,
-            RISK_LIMITS.maxStopPercent
+            RISK_LIMITS.maxStopPercent,
+            RISK_LIMITS.entryMinRiskReward
         );
 
         const levelValidation = validateTradeLevels(

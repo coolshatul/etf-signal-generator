@@ -1,14 +1,20 @@
 import { analyzeEtfBullish } from '../services/analyzeEtfBullish';
 import { sendBullishStocksAlert } from '../alerts/telegram';
-import { sendBullishStocksEmail } from '../alerts/email';
+import { sendBookCapacityEmail, sendBullishStocksEmail } from '../alerts/email';
 import {
     filterNewSignals,
+    getOpenBook,
     getUnsentSignals,
     logBullishSignals,
     markAlertsSent,
 } from '../db/mongo';
 import { isTodayHoliday } from '../utils/holidays';
-import { ALERT_CHANNELS, DEDUPE_COOLDOWN_MS } from '../config/settings';
+import {
+    ALERT_CHANNELS,
+    BOOK_LIMITS,
+    DEDUPE_COOLDOWN_MS,
+} from '../config/settings';
+import { selectWithinBookLimits } from '../utils/bookLimits';
 import {
     SIGNAL_STRATEGIES,
     buildSignalKey,
@@ -83,15 +89,40 @@ export const handler = async (): Promise<void> => {
             return;
         }
 
+        // Book-level limits: the strategy is one long-India bet, so the
+        // number of simultaneous positions and per-group concentration cap
+        // what can be added today. Highest-rated setups win the slots.
+        const book = await getOpenBook(STRATEGY);
+        const { accepted, skippedSlots, skippedGroup } = selectWithinBookLimits(
+            fresh,
+            book,
+            BOOK_LIMITS
+        );
+
+        console.log(
+            `📚 Book ${book.count}/${BOOK_LIMITS.maxOpenPositions} open; accepted ${accepted.length}, skipped ${skippedSlots} (slots), ${skippedGroup} (group cap)`
+        );
+
         // Persist first. The alert is only marked as sent after delivery, so a
         // failed email is retried instead of silently dropped.
-        if (fresh.length) {
-            await logBullishSignals(fresh, STRATEGY, TIMEFRAME);
+        if (accepted.length) {
+            await logBullishSignals(accepted, STRATEGY, TIMEFRAME);
         }
 
         const pending = await getUnsentSignals(STRATEGY);
 
         if (!pending.length) {
+            if (fresh.length && accepted.length === 0 && ALERT_CHANNELS.email) {
+                await sendBookCapacityEmail({
+                    open: book.count,
+                    cap: BOOK_LIMITS.maxOpenPositions,
+                    setups: fresh.map(result => ({
+                        symbol: result.symbol,
+                        rating: result.rating,
+                        maxEntry: result.maxEntry,
+                    })),
+                });
+            }
             console.log('📭 No new bullish signals - skipping alerts.');
             return;
         }

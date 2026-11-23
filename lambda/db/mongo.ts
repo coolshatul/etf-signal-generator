@@ -9,7 +9,7 @@ import {
     SignalTimeframe,
 } from '../types';
 import { fetchHistoricalData, fetchCorporateActions } from '../utils/fetchData';
-import { processWithConcurrency } from '../utils/common';
+import { etfExposureGroup, processWithConcurrency } from '../utils/common';
 import { maxValidEntry } from '../utils/tradeLevels';
 import {
     buildSignalKey,
@@ -222,7 +222,12 @@ export async function filterNewSignals<T extends { symbol: string; asOf?: string
  * The 1.5 screen already ran at signal time; a gap can erode it.
  */
 export function computeMaxEntry(stopLoss: number, target: number): number {
-    return maxValidEntry(stopLoss, target, RISK_LIMITS.maxStopPercent);
+    return maxValidEntry(
+        stopLoss,
+        target,
+        RISK_LIMITS.maxStopPercent,
+        RISK_LIMITS.entryMinRiskReward
+    );
 }
 
 export async function logBullishSignals(
@@ -324,6 +329,29 @@ export async function getUnsentSignals(
     })
         .sort({ entryAt: 1 })
         .limit(limit);
+}
+
+/**
+ * Current open book for a strategy, grouped by exposure. Used to cap the
+ * number of simultaneous positions and per-group concentration.
+ */
+export async function getOpenBook(strategy: string): Promise<{
+    count: number;
+    byGroup: Record<string, number>;
+}> {
+    await connectToDatabase();
+
+    const rows = await Signal.find({ strategy, status: 'OPEN' })
+        .select('symbol')
+        .lean();
+
+    const byGroup: Record<string, number> = {};
+    for (const row of rows) {
+        const group = etfExposureGroup(row.symbol);
+        byGroup[group] = (byGroup[group] ?? 0) + 1;
+    }
+
+    return { count: rows.length, byGroup };
 }
 
 export async function markAlertsSent(ids: string[]): Promise<void> {

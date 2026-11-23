@@ -105,7 +105,10 @@ A scored candidate is not a signal until its levels make sense:
   check tolerates floating-point rounding).
 - Stop distance between **0.5%** and **12%** of entry.
 - Entry ceiling: the highest next open that keeps the stop within 12% and the
-  reward at least equal to the risk.
+  reward at least 1.2x the risk.
+- Book limits: at most **8 open positions**, and at most **2 per exposure group**
+  (broad market, banks, US tech, IT, commodities, sector). When the book is
+  full the scan sends a capacity note instead of new entries.
 - Rejected candidates are logged with a reason and never alerted.
 
 ### Costs and corporate actions
@@ -227,6 +230,8 @@ by `RISK_LIMITS`.
 | `npm run repair-signal-data` | Repairs legacy statuses/exit reasons and marks backlog closes (`-- --dry-run` to preview) |
 | `npm run backtest-aligned` | Replays the live rules; `--strategy`, `--timeframe`, `--days`, `--symbols`, `--limit`, `--legacy` |
 | `npm run sweep-bullish` | Parameter sweep and robustness checks for the ETF scan |
+| `npm run sweep-entry-rules` | Cooldown and entry-floor sensitivity |
+| `npm run portfolio-sim` | Portfolio construction: slots, combined risk, group caps |
 | `npm run archive-signals` | Moves non-ETF history to `signals_archive` (`-- --dry-run` to preview) |
 | `npm run cdk`       | Synthesizes the CDK stack                |
 

@@ -24,6 +24,7 @@ import {
     evaluateCrossoverAt,
 } from '../strategy/liveRules';
 import { backtestSeries, summarise } from '../strategy/alignedBacktest';
+import { selectWithinBookLimits } from '../utils/bookLimits';
 import { CandleWithIndicators } from '../types';
 
 function testSignalIdentity() {
@@ -411,9 +412,11 @@ function testLiveRules() {
     assert.strictEqual(falling.isBullish, false);
     assert.strictEqual(falling.blockedBy, 'not up vs previous close');
 
-    // Entry ceiling: stop within 12% and reward at least 1:1.
+    // Entry ceiling: stop within 12% and a reward floor.
     assert.strictEqual(maxValidEntry(90, 105), 97.5);
     assert.ok(maxValidEntry(90, 200) > 97.5);
+    // At a 1.2 floor the ceiling is (target + 1.2*stop) / 2.2.
+    assert.strictEqual(maxValidEntry(90, 105, 12, 1.2), (105 + 108) / 2.2);
 
     const levels = calculateBullishLevels(100, 95, 110, 97, 1);
     assert.strictEqual(levels.baseStopLevel, 97);
@@ -589,7 +592,7 @@ function testAlignedBacktest() {
         risingSeries(140),
         'ETF_BULLISH_SCAN',
         '1d',
-        { entryModel: 'next_open' }
+        { entryModel: 'next_open', entryMinRiskReward: 1.0 }
     );
     assert.ok(executable.trades.length > 0, 'expected next-open trades');
     assert.strictEqual(executable.trades[0].entryModel, 'next_open');
@@ -633,13 +636,73 @@ function testAlignedBacktest() {
         gapRows,
         'ETF_BULLISH_SCAN',
         '1d',
-        { entryModel: 'next_open' }
+        { entryModel: 'next_open', entryMinRiskReward: 1.0 }
     );
     assert.strictEqual(gapped.trades[0].exitReason, 'STOP');
     assert.strictEqual(gapped.trades[0].exitPrice, 140);
     assert.ok(gapped.trades[0].exitPrice < 146.5, 'fill must be below the stop');
 
     console.log('✅ aligned backtest OK');
+}
+
+function testBookLimits() {
+    const limits = { maxOpenPositions: 8, maxPerGroup: 2 };
+
+    // Two slots free, but only one per group.
+    const onePerGroup = selectWithinBookLimits(
+        [
+            { symbol: 'NIFTYBEES', rating: 9 },
+            { symbol: 'BANKBEES', rating: 8 },
+            { symbol: 'NIFTYETF', rating: 7 },
+        ],
+        { count: 6, byGroup: {} },
+        { maxOpenPositions: 8, maxPerGroup: 1 }
+    );
+    assert.deepStrictEqual(
+        onePerGroup.accepted.map(item => item.symbol),
+        ['NIFTYBEES', 'BANKBEES']
+    );
+    // The third candidate loses on slots before the group check runs.
+    assert.strictEqual(onePerGroup.skippedSlots, 1);
+    assert.strictEqual(onePerGroup.skippedGroup, 0);
+
+    // Book already full: nothing is added, and the best rating is not a bypass.
+    const full = selectWithinBookLimits(
+        [
+            { symbol: 'ITBEES', rating: 9 },
+            { symbol: 'GOLDBEES', rating: 8 },
+        ],
+        { count: 8, byGroup: {} },
+        limits
+    );
+    assert.strictEqual(full.accepted.length, 0);
+    assert.strictEqual(full.skippedSlots, 2);
+
+    // One slot free: the higher-rated setup wins it.
+    const oneSlot = selectWithinBookLimits(
+        [
+            { symbol: 'CPSEETF', rating: 6 },
+            { symbol: 'AUTOBEES', rating: 9 },
+        ],
+        { count: 7, byGroup: {} },
+        limits
+    );
+    assert.deepStrictEqual(
+        oneSlot.accepted.map(item => item.symbol),
+        ['AUTOBEES']
+    );
+    assert.strictEqual(oneSlot.skippedSlots, 1);
+
+    // A group at its cap is skipped even when slots are free.
+    const groupFull = selectWithinBookLimits(
+        [{ symbol: 'NIFTYETF', rating: 9 }],
+        { count: 2, byGroup: { broad: 2 } },
+        limits
+    );
+    assert.strictEqual(groupFull.accepted.length, 0);
+    assert.strictEqual(groupFull.skippedGroup, 1);
+
+    console.log('✅ book limits OK');
 }
 
 try {
@@ -652,6 +715,7 @@ try {
     testLiveRules();
     testCrossoverRules();
     testAlignedBacktest();
+    testBookLimits();
     console.log('🎉 All signal logic tests passed.');
 } catch (err) {
     console.error('❌ Signal logic test failed:', err);

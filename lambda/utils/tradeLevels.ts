@@ -47,11 +47,14 @@ function finitePositive(value: number): boolean {
 export function maxValidEntry(
     stopLoss: number,
     target: number,
-    maxStopPercent: number = DEFAULT_MAX_STOP_PERCENT
+    maxStopPercent: number = DEFAULT_MAX_STOP_PERCENT,
+    minRiskReward: number = 1
 ): number {
     if (!Number.isFinite(stopLoss) || stopLoss <= 0) return 0;
     const maxByStop = stopLoss / (1 - maxStopPercent / 100);
-    const maxByReward = (target + stopLoss) / 2;
+    // reward / risk >= minRiskReward  =>  entry <= (target + r*stop) / (1+r)
+    const maxByReward =
+        (target + minRiskReward * stopLoss) / (1 + minRiskReward);
     return Math.min(maxByStop, maxByReward);
 }
 

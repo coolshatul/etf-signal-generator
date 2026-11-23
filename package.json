@@ -16,7 +16,9 @@
     "repair-signal-data": "npx ts-node lambda/scripts/repairSignalData.ts",
     "backtest-aligned": "npx ts-node lambda/scripts/runAlignedBacktest.ts",
     "sweep-bullish": "npx ts-node lambda/scripts/sweepBullishParams.ts",
-    "archive-signals": "npx ts-node lambda/scripts/archiveSignals.ts"
+    "archive-signals": "npx ts-node lambda/scripts/archiveSignals.ts",
+    "sweep-entry-rules": "npx ts-node lambda/scripts/sweepEntryRules.ts",
+    "portfolio-sim": "npx ts-node lambda/scripts/portfolioSim.ts"
   },
   "keywords": [],
   "author": "",

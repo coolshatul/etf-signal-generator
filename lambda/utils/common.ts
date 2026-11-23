@@ -47,6 +47,32 @@ export const intradayEtfSymbols = [
     'JUNIORBEES', 'HDFCSML250', 'MON100', 'PSUBNKBEES', 'PHARMABEES',
 ];
 
+// Exposure groups for book-level concentration limits. Correlated ETFs share
+// a group, so the book cannot become one large directional bet.
+export const ETF_EXPOSURE_GROUPS: Record<string, string> = {
+    GOLDBEES: 'commodity',
+    SILVERBEES: 'commodity',
+    MON100: 'us_tech',
+    MAFANG: 'us_tech',
+    ITBEES: 'it',
+    BANKBEES: 'banks',
+    PSUBNKBEES: 'banks',
+    NIFTYBEES: 'broad',
+    NIFTYETF: 'broad',
+    JUNIORBEES: 'broad',
+    HDFCSML250: 'broad',
+    MIDCAPETF: 'broad',
+    ALPHA: 'broad',
+    PHARMABEES: 'sector',
+    FMCGIETF: 'sector',
+    AUTOBEES: 'sector',
+    CPSEETF: 'sector',
+};
+
+export function etfExposureGroup(symbol: string): string {
+    return ETF_EXPOSURE_GROUPS[symbol.trim().toUpperCase()] ?? 'other';
+}
+
 // Configuration constants
 export const API_CONFIG = {
     DELAY_MS: 100,  // Delay between API calls to avoid rate limits

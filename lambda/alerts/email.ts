@@ -547,6 +547,67 @@ export async function sendEMA36Email(ema36Results: EMA36Result[]): Promise<void>
     );
 }
 
+/**
+ * Sent when the scan qualified setups but the book is already at its
+ * position cap. Silence would otherwise look like a failure.
+ */
+export async function sendBookCapacityEmail(input: {
+    open: number;
+    cap: number;
+    setups: Array<{ symbol: string; rating: number; maxEntry?: number }>;
+}): Promise<void> {
+    const rows = input.setups.slice(0, MAX_EMAIL_SIGNALS).map(setup =>
+        renderRow([
+            symbolCell(setup.symbol, `Rating ${setup.rating}/10`),
+            `<div style="font-size:12px;color:#92400e;font-weight:600;">Not entered</div>`,
+            `<div style="font-size:13px;color:#111827;">${
+                setup.maxEntry ? inr(setup.maxEntry) : '—'
+            }</div>`,
+        ])
+    );
+
+    const html = renderEmailShell({
+        title: 'Book at Capacity — No New Entries',
+        accent: '#92400e',
+        preheader: `${input.open} positions open against a cap of ${input.cap}.`,
+        intro: `The scan qualified ${input.setups.length} setup${
+            input.setups.length === 1 ? '' : 's'
+        }, but ${input.open} positions are already open against a cap of ${
+            input.cap
+        }. Nothing was added today.`,
+        stats: [
+            {
+                label: 'Open',
+                value: String(input.open),
+                tone: 'negative',
+            },
+            { label: 'Cap', value: String(input.cap) },
+            { label: 'Skipped', value: String(input.setups.length) },
+        ],
+        table:
+            rows.length > 0
+                ? renderSignalTable(
+                      ['ETF', 'Status', 'Entry ceiling'],
+                      rows
+                  )
+                : '',
+        explainerTitle: 'Why you are seeing this',
+        explainer: [
+            'The strategy is one long-India bet, so the book caps how many correlated positions can be open at once.',
+            'New entries resume when positions close on stop, target, or the 45-day window.',
+            'These setups were not entered and are not tracked as trades.'
+        ]
+    });
+
+    await sendEmailWithRetry(
+        `ETF book full — no new entries (${getCurrentDate()})`,
+        html
+    );
+    console.log(
+        `📧 Book-capacity email sent (${input.open}/${input.cap} open, ${input.setups.length} skipped)`
+    );
+}
+
 const STRATEGY_LABELS: Record<string, string> = {
     ETF_BULLISH_SCAN: 'ETF bullish swing',
     BULLISH_SCAN: 'Bullish swing (stocks)',

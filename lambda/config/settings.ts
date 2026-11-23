@@ -15,10 +15,21 @@ export const STRATEGY_SETTINGS: StrategySettings = {
 
 // Live-signal risk gates. These are separate from the backtest settings above.
 export const RISK_LIMITS = {
+    /** Reward:risk required at the signal close. */
     minRiskReward: 1.5,
+    /** Reward:risk required at the executable next-open fill. */
+    entryMinRiskReward: 1.2,
     minStopPercent: 0.5,
     maxStopPercent: 12,
     maxOpenAgeDays: 45,
+};
+
+// Book-level limits. The strategy is one long-India bet, so the number of
+// simultaneous positions and the count per exposure group matter more than
+// another signal filter.
+export const BOOK_LIMITS = {
+    maxOpenPositions: 8,
+    maxPerGroup: 2,
 };
 
 // Delivery round-trip cost estimate: brokerage, STT, exchange charges, GST and
